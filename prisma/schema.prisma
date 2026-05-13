@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  name               String
+  phone              String?
+  password           String
+  role               UserRole        @default(POC)
+  location           String?
+  branch             String?
+  active             Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  activities         Activity[]
+  projectsPoc        Project[]       @relation("ProjectPoc")
+  projectsClient     Project[]       @relation("ProjectClient")
+  fileUploads        FileUpload[]
+  statusChanges      StatusHistory[]
+  approvalsRequested Approval[]      @relation("approvalRequestedBy")
+  approvalsMade      Approval[]      @relation("approvalApprovedBy")
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+model Project {
+  id                    String          @id @default(cuid())
+  projectId             String          @unique
+  name                  String
+  piNumber              String?
+  piStatus              String? // PENDING, VERIFIED, REJECTED — null until PI is generated
+  piPdfUrl              String?
+  piGeneratedAt         DateTime?
+  piVerifiedBy          String?
+  piVerifiedAt          DateTime?
+  location              String
+  state                 String?
+  deliveryDate          DateTime
+  status                ProjectStatus   @default(REQUESTED)
+  totalCost             Float           @default(0) // Total base cost excluding GST
+  grandTotal            Float           @default(0) // Total amount including GST
+  instructions          String?
+  packingCharges        Float           @default(0)
+  packingChargesGstRate Float           @default(18)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  pocId                 String?
+  clientId              String?
+  branch                String?
+  leadsConverted        Int?
+  leadsGenerated        Int?
+  approval              Approval?
+  collaterals           Collateral[]
+  dispatch              Dispatch?
+  files                 FileUpload[]
+  poc                   User?           @relation("ProjectPoc", fields: [pocId], references: [id], onDelete: SetNull)
+  client                User?           @relation("ProjectClient", fields: [clientId], references: [id], onDelete: SetNull)
+  statusHistory         StatusHistory[]
+
+  @@map("projects")
+}
+
+model Collateral {
+  id            String  @id @default(cuid())
+  projectId     String
+  itemName      String
+  quantity      Int
+  unitPrice     Float
+  totalPrice    Float // quantity * unitPrice (base total)
+  gstRate       Float   @default(18.0)
+  gstAmount     Float   @default(0) // totalPrice * (gstRate / 100)
+  specification String?
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("collaterals")
+}
+
+model StatusHistory {
+  id          String        @id @default(cuid())
+  projectId   String
+  status      ProjectStatus
+  note        String?
+  timestamp   DateTime      @default(now())
+  changedById String?
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  changedBy   User?         @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@map("status_history")
+}
+
+model FileUpload {
+  id           String   @id @default(cuid())
+  projectId    String
+  type         FileType
+  url          String
+  filename     String
+  size         Int?
+  uploadedAt   DateTime @default(now())
+  uploadedById String?
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@map("file_uploads")
+}
+
+model Approval {
+  id            String         @id @default(cuid())
+  projectId     String         @unique
+  status        ApprovalStatus @default(PENDING)
+  requestedById String
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  notes         String?
+  reminderCount Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy   User           @relation("approvalRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  approvedBy    User?          @relation("approvalApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@map("approvals")
+}
+
+model Dispatch {
+  id               String    @id @default(cuid())
+  projectId        String    @unique
+  courier          String
+  trackingId       String?
+  trackingUrl      String?
+  dispatchDate     DateTime?
+  expectedDelivery DateTime?
+  actualDelivery   DateTime?
+  status           String    @default("in_transit")
+  podUrl           String?
+  notes            String?
+  courierDetails   Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("dispatches")
+}
+
+model RateCard {
+  id            String   @id @default(cuid())
+  itemName      String
+  subcategory   String?
+  specification String
+  volumeSlabs   Json
+  gstRate       Float    @default(18.0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("rate_cards")
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  title     String
+  message   String
+  type      String
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("password_reset_tokens")
+}
+
+enum UserRole {
+  ADMIN
+  POC
+  CLIENT
+}
+
+enum ProjectStatus {
+  REQUESTED
+  APPROVED
+  PRINTING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FileType {
+  PO
+  CHALLAN
+  INVOICE
+  POD
+}

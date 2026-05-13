@@ -1,0 +1,105 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { sendOutstandingPaymentReminderEmail } from "@/lib/email"
+import { logActivity } from "@/lib/audit"
+import { formatCurrency } from "@/utils/formatters"
+
+const APP_URL = process.env.NEXTAUTH_URL || "http://localhost:3000"
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    // Only admins can send payment reminders
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Only admins can send payment reminders" }, { status: 403 })
+    }
+
+    // Get project with POC and invoice details
+    const project = await prisma.project.findUnique({
+      where: { id },
+      include: {
+        poc: true,
+        files: {
+          where: { type: "INVOICE" },
+          orderBy: { uploadedAt: "desc" },
+          take: 1
+        }
+      }
+    })
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 })
+    }
+
+    if (!project.poc?.email) {
+      return NextResponse.json({ error: "POC email not found" }, { status: 400 })
+    }
+
+    // Check if project is delivered (only send reminders for delivered projects)
+    if (project.status !== "DELIVERED") {
+      return NextResponse.json({ error: "Payment reminders can only be sent for delivered projects" }, { status: 400 })
+    }
+
+    // Get the latest invoice or fall back to PI information
+    const latestInvoice = project.files[0]
+    
+    let invoiceNumber: string
+    let invoiceDate: string
+    let referenceType: string
+    
+    if (latestInvoice) {
+      // Use actual invoice data
+      invoiceNumber = latestInvoice.filename.replace(/\.[^/.]+$/, "") // Remove file extension
+      invoiceDate = new Date(latestInvoice.uploadedAt).toLocaleDateString('en-IN')
+      referenceType = "Invoice"
+    } else if (project.piNumber && project.piGeneratedAt) {
+      // Fall back to PI (Proforma Invoice) data
+      invoiceNumber = project.piNumber
+      invoiceDate = new Date(project.piGeneratedAt).toLocaleDateString('en-IN')
+      referenceType = "Proforma Invoice"
+    } else {
+      // No invoice or PI available
+      return NextResponse.json({ 
+        error: "No invoice or proforma invoice found for this project. Please upload an invoice or generate a PI first." 
+      }, { status: 400 })
+    }
+
+    // Send the payment reminder email
+    await sendOutstandingPaymentReminderEmail(project.poc.email, {
+      pocName: project.poc.name,
+      projectName: project.name,
+      invoiceNumber: invoiceNumber,
+      invoiceDate: invoiceDate,
+      outstandingAmount: formatCurrency(project.grandTotal || project.totalCost * 1.18),
+      appUrl: APP_URL,
+      referenceType: referenceType, // Add this to email data
+    })
+
+    // Log the activity
+    await logActivity({
+      userId: session.user.id,
+      action: "PAYMENT_REMINDER_SENT",
+      entityType: "project",
+      entityId: id,
+      details: {
+        pocEmail: project.poc.email,
+        referenceType: referenceType,
+        invoiceNumber: invoiceNumber,
+        outstandingAmount: project.grandTotal || project.totalCost * 1.18
+      },
+    })
+
+    return NextResponse.json({ success: true, message: "Payment reminder sent successfully" })
+  } catch (error) {
+    console.error("Failed to send payment reminder:", error)
+    return NextResponse.json({ error: "Failed to send payment reminder" }, { status: 500 })
+  }
+}
