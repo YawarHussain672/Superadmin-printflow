@@ -2,15 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { v2 as cloudinary } from "cloudinary"
+import { uploadToS3 } from "@/lib/s3"
 import { logActivity } from "@/lib/audit"
 import { pusherServer, CHANNELS, EVENTS } from "@/lib/pusher"
-
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
 
 // POST /api/dispatch/[id]/pod — upload Proof of Delivery
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -50,19 +44,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "POCs can upload POD only after admin approves the project and verifies the PI" }, { status: 403 })
     }
 
-    // Upload to Cloudinary
+    // Upload to S3
     const bytes = await file.arrayBuffer()
-    const base64 = `data:${file.type};base64,${Buffer.from(bytes).toString("base64")}`
-    const result = await cloudinary.uploader.upload(base64, {
-      folder: `axis-print/${dispatch.projectId}/pod`,
-      resource_type: "auto",
-      public_id: `pod_${Date.now()}`,
-    })
+    const buffer = Buffer.from(bytes)
+    const key = `axis-print/${dispatch.projectId}/pod/pod_${Date.now()}_${file.name.replace(/\s+/g, "_")}`
+    const s3Url = await uploadToS3(buffer, key, file.type)
 
     // Save POD URL to dispatch
     await prisma.dispatch.update({
       where: { id },
-      data: { podUrl: result.secure_url },
+      data: { podUrl: s3Url },
     })
 
     await logActivity({
@@ -70,13 +61,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       action: "POD_UPLOADED",
       entityType: "dispatch",
       entityId: id,
-      details: { url: result.secure_url },
+      details: { url: s3Url },
     })
 
     await pusherServer.trigger(CHANNELS.DISPATCH, EVENTS.DISPATCH_UPDATED, { id })
     await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { projectId: dispatch.projectId })
 
-    return NextResponse.json({ url: result.secure_url })
+    return NextResponse.json({ url: s3Url })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Upload failed"
     return NextResponse.json({ error: errorMessage }, { status: 500 })

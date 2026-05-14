@@ -12,6 +12,8 @@ model User {
   email              String          @unique
   name               String
   phone              String?
+  clientPan          String?
+  clientGst          String?
   password           String
   role               UserRole        @default(POC)
   location           String?

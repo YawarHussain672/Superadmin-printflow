@@ -89,16 +89,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Database transaction failed", details: txError instanceof Error ? txError.message : String(txError) }, { status: 500 })
       }
 
-      // Send approval email to POC (if POC still exists)
+      // Send approval email + in-app notification to POC (if POC still exists)
       if (approval.project.poc) {
-        await sendProjectApprovedEmail(approval.project.poc.email, {
-          pocName: approval.project.poc.name,
-          projectName: approval.project.name,
-          projectId: approval.project.projectId,
-          location: approval.project.location,
-          totalCost: formatCurrency(approval.project.totalCost),
-          appUrl: APP_URL,
-        })
+        try {
+          await sendProjectApprovedEmail(approval.project.poc.email, {
+            pocName: approval.project.poc.name,
+            projectName: approval.project.name,
+            projectId: approval.project.projectId,
+            location: approval.project.location,
+            totalCost: formatCurrency(approval.project.totalCost),
+            appUrl: APP_URL,
+          })
+        } catch (emailError) {
+          console.error("[EMAIL ERROR] Failed to send project approved email:", emailError)
+        }
 
         // In-app notification
         await notifyProjectApproved(approval.projectId, approval.project.poc.id, approval.project.name, approval.project.projectId)
@@ -138,15 +142,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Database transaction failed", details: txError instanceof Error ? txError.message : String(txError) }, { status: 500 })
       }
 
-      // Send rejection email to POC (if POC still exists)
+      // Send rejection email + in-app notification to POC (if POC still exists)
       if (approval.project.poc) {
-        await sendProjectRejectedEmail(approval.project.poc.email, {
-          pocName: approval.project.poc.name,
-          projectName: approval.project.name,
-          projectId: approval.project.projectId,
-          reason: notesText,
-          appUrl: APP_URL,
-        })
+        try {
+          await sendProjectRejectedEmail(approval.project.poc.email, {
+            pocName: approval.project.poc.name,
+            projectName: approval.project.name,
+            projectId: approval.project.projectId,
+            reason: notesText,
+            appUrl: APP_URL,
+          })
+        } catch (emailError) {
+          console.error("[EMAIL ERROR] Failed to send project rejected email:", emailError)
+        }
 
         // In-app notification
         await notifyProjectRejected(approval.projectId, approval.project.poc.id, approval.project.name, approval.project.projectId, notesText)
@@ -169,14 +177,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       // Send Pending PO reminder email to POC (not admins)
       if (approval.project.poc?.email) {
-        await sendPendingPOReminderEmail(approval.project.poc.email, {
-          pocName: approval.project.poc.name,
-          projectName: approval.project.name,
-          piNumber: approval.project.piNumber || approval.project.projectId,
-          piDate: new Date(approval.project.createdAt).toLocaleDateString('en-IN'),
-          piAmount: formatCurrency(approval.project.totalCost),
-          appUrl: APP_URL,
-        })
+        try {
+          await sendPendingPOReminderEmail(approval.project.poc.email, {
+            pocName: approval.project.poc.name,
+            projectName: approval.project.name,
+            piNumber: approval.project.piNumber || approval.project.projectId,
+            piDate: new Date(approval.project.createdAt).toLocaleDateString('en-IN'),
+            piAmount: formatCurrency(approval.project.totalCost),
+            appUrl: APP_URL,
+          })
+        } catch (emailError) {
+          console.error("[EMAIL ERROR] Failed to send PO reminder email:", emailError)
+        }
       }
 
       // Audit log

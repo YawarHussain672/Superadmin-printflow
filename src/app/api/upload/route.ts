@@ -3,21 +3,14 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { FileType } from "@prisma/client"
-import { v2 as cloudinary } from "cloudinary"
+import { uploadToS3, getPresignedUrl } from "@/lib/s3"
 import { logActivity } from "@/lib/audit"
 import { pusherServer, CHANNELS, EVENTS } from "@/lib/pusher"
-
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
 
 // POST /api/upload
 // Body: FormData with fields: file (File), projectId (string), fileType (PO | CHALLAN | INVOICE)
 export async function POST(request: NextRequest) {
   try {
-
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -65,27 +58,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invoice can only be uploaded after dispatch" }, { status: 400 })
     }
 
-    // Convert file to base64 for Cloudinary upload
-
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    const base64 = `data:${file.type};base64,${buffer.toString("base64")}`
-
-    // Upload to Cloudinary with public access
-    const uploadResult = await cloudinary.uploader.upload(base64, {
-      folder: `axis-print/${projectId}/${fileType.toLowerCase()}`,
-      resource_type: "auto",
-      public_id: `${fileType.toLowerCase()}_${Date.now()}`,
-      type: "upload",
-      access_mode: "public",
-    })
+    // Upload to S3
+    const buffer = await file.arrayBuffer()
+    const timestamp = Date.now()
+    const key = `axis-print/${projectId}/${fileType.toLowerCase()}/${timestamp}-${file.name.replace(/\s+/g, "_")}`
+    const secure_url = await uploadToS3(buffer, key, file.type)
 
     // Save to database
     const fileRecord = await prisma.fileUpload.create({
       data: {
         projectId,
         type: fileType as FileType,
-        url: uploadResult.secure_url,
+        url: secure_url,
         filename: file.name,
         size: file.size,
         uploadedById: session.user.id,
@@ -103,9 +87,12 @@ export async function POST(request: NextRequest) {
     await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { id: projectId })
     await pusherServer.trigger(CHANNELS.DASHBOARD, EVENTS.STATS_UPDATED, {})
 
+    // Sign the URL for immediate access
+    const signedUrl = await getPresignedUrl(secure_url)
+
     return NextResponse.json({
       id: fileRecord.id,
-      url: uploadResult.secure_url,
+      url: signedUrl,
       filename: file.name,
       size: file.size,
     }, { status: 201 })

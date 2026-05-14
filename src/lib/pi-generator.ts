@@ -73,9 +73,9 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   }
   doc.text(`${project.location || ""}${project.state ? `, ${project.state}` : ""}`, 12, custY)
   custY += 4.5
-  doc.text("PAN/IT No :", 12, custY)
+  doc.text(`PAN/IT No : ${project.clientPan || ""}`, 12, custY)
   custY += 4.5
-  doc.text("GST No.", 12, custY)
+  doc.text(`GST No. : ${project.clientGst || ""}`, 12, custY)
 
   // Proforma Details Box (Right)
   const rightBoxX = 10 + colWidth

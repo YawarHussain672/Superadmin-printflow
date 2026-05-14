@@ -139,37 +139,22 @@ export function PISection({
     }
   }
 
-  // View PI (open in new tab)
+  // View PI (open in new tab via authenticated server route)
   const handleViewPI = () => {
     if (piPdfUrl) {
-      window.open(piPdfUrl, "_blank")
+      window.open(`/api/projects/${projectId}/download-pi?inline=true`, "_blank")
     }
   }
 
-  // Download PI (actual file download)
-  const handleDownloadPI = async () => {
-    if (!piPdfUrl) return
-
-    try {
-      const response = await fetch(piPdfUrl)
-      const blob = await response.blob()
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = `${piNumber || "PI"}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-
-      toast.success("PI downloaded successfully")
-    } catch (error) {
-      toast.error("Failed to download PI")
-      // Fallback: open in new tab
-      window.open(piPdfUrl, "_blank")
-    }
+  // Download PI — use server-side route so browser gets Content-Disposition: attachment
+  const handleDownloadPI = () => {
+    const link = document.createElement("a")
+    link.href = `/api/projects/${projectId}/download-pi`
+    link.download = `${piNumber || "PI"}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success("PI download started")
   }
 
   // Get status badge color

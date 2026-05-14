@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getPresignedUrl } from "@/lib/s3"
 
-// GET /api/dispatch/[id]/pod/view - Proxy POD file from Cloudinary
+// GET /api/dispatch/[id]/pod/view - Securely proxy POD file from private S3
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,27 +35,33 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Fetch file from Cloudinary using original URL
-    const response = await fetch(dispatch.podUrl)
-    if (!response.ok) {
-      return NextResponse.json({ error: "Failed to fetch POD from Cloudinary", details: `Status: ${response.status}`, url: dispatch.podUrl }, { status: 500 })
+    // Generate a presigned URL, then fetch the file server-side to avoid CORS issues
+    const presignedUrl = await getPresignedUrl(dispatch.podUrl, 300)
+    const s3Response = await fetch(presignedUrl)
+
+    if (!s3Response.ok) {
+      console.error("S3 fetch failed:", s3Response.status, dispatch.podUrl)
+      return NextResponse.json(
+        { error: "Failed to fetch POD from storage", details: `Status: ${s3Response.status}` },
+        { status: 502 }
+      )
     }
 
-    const blob = await response.blob()
-    const arrayBuffer = await blob.arrayBuffer()
+    // Determine file extension from URL for filename
+    const urlPath = new URL(dispatch.podUrl).pathname
+    const ext = urlPath.split(".").pop()?.toLowerCase() || "pdf"
+    const contentType = s3Response.headers.get("content-type") || "application/octet-stream"
 
-    // Determine content type
-    const contentType = response.headers.get("content-type") || "application/octet-stream"
-
-    // Create headers for inline viewing
-    const headers = new Headers()
-    headers.set("Content-Type", contentType)
-    headers.set("Content-Length", arrayBuffer.byteLength.toString())
-    headers.set("Content-Disposition", `inline; filename="pod_${dispatch.id}.pdf"`)
-    headers.set("Cache-Control", "public, max-age=3600")
-
-    return new NextResponse(arrayBuffer, { headers })
+    return new NextResponse(s3Response.body, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="POD_${dispatch.id}.${ext}"`,
+        "Cache-Control": "no-store",
+      },
+    })
   } catch (error) {
+    console.error("Error serving POD:", error)
     return NextResponse.json({ error: "Failed to serve POD" }, { status: 500 })
   }
 }

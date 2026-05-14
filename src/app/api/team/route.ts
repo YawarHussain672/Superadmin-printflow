@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { sendWelcomeEmail } from "@/lib/email"
 
 // Valid roles including newly added CLIENT
 type UserRole = "ADMIN" | "POC" | "CLIENT"
@@ -82,6 +83,20 @@ export async function POST(request: NextRequest) {
       active: user.active,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+    }
+
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"
+      await sendWelcomeEmail(user.email, {
+        name: user.name,
+        email: user.email,
+        password: password,
+        role: user.role,
+        appUrl
+      })
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError)
+      // Continue without failing the request
     }
 
     return NextResponse.json(safeUser, { status: 201 })

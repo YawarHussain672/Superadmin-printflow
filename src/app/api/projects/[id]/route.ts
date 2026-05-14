@@ -8,56 +8,28 @@ import { createNotification } from "@/lib/notifications"
 import { sendProductionStartedEmail, sendShipmentDispatchedEmail } from "@/lib/email"
 import { formatCurrency } from "@/utils/formatters"
 import { calculateTotal } from "@/lib/ratecard"
-import { v2 as cloudinary } from "cloudinary"
+import { deleteFromS3 } from "@/lib/s3"
 
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
-
-function getCloudinaryPublicIdFromUrl(url: string): string | null {
+function getS3KeyFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null
   try {
-    const parsed = new URL(url)
-    const parts = parsed.pathname.split("/").filter(Boolean)
-    const uploadIndex = parts.indexOf("upload")
-    if (uploadIndex === -1) return null
-
-    const publicPathParts = parts.slice(uploadIndex + 1)
-    if (publicPathParts[0]?.match(/^v\d+$/)) {
-      publicPathParts.shift()
+    const urlParts = url.split(".amazonaws.com/")
+    if (urlParts.length > 1) {
+      return decodeURIComponent(urlParts[1])
     }
-
-    return decodeURIComponent(publicPathParts.join("/"))
+    return null
   } catch {
     return null
   }
 }
 
-async function deleteCloudinaryAsset(url: string | null | undefined) {
-  if (!url) return
-
-  const publicId = getCloudinaryPublicIdFromUrl(url)
-  if (!publicId) return
-
-  const publicIdWithoutExtension = publicId.replace(/\.[^/.]+$/, "")
-  const attempts = [
-    { publicId, resource_type: "raw" as const },
-    { publicId: publicIdWithoutExtension, resource_type: "raw" as const },
-    { publicId: publicIdWithoutExtension, resource_type: "image" as const },
-    { publicId, resource_type: "image" as const },
-  ]
-
-  for (const attempt of attempts) {
+async function deleteS3Asset(url: string | null | undefined) {
+  const key = getS3KeyFromUrl(url)
+  if (key) {
     try {
-      const result = await cloudinary.uploader.destroy(attempt.publicId, {
-        resource_type: attempt.resource_type,
-      })
-      if (result.result === "ok") {
-        return
-      }
-    } catch {
-      // Try the next resource/public ID shape.
+      await deleteFromS3(key)
+    } catch (error) {
+      console.error(`Failed to delete S3 asset with key ${key}:`, error)
     }
   }
 }
@@ -87,6 +59,8 @@ async function priceCollaterals(collaterals: Array<{ itemName: string; quantity:
 }
 
 // GET /api/projects/[id]
+import { signProjectUrls } from "@/lib/project-utils";
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
@@ -106,7 +80,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
-    if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
     // Allow access if: admin, POC assigned, or client assigned
     const isAuthorized = session.user.role === "ADMIN" ||
       project.pocId === session.user.id ||
@@ -115,7 +92,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    return NextResponse.json(project)
+    const signedProject = await signProjectUrls(project as any);
+    return NextResponse.json(signedProject);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch project" }, { status: 500 })
   }
@@ -232,13 +210,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
         // Send Production Started email to POC
         if (existing.poc?.email) {
-          await sendProductionStartedEmail(existing.poc.email, {
-            pocName: existing.poc.name,
-            projectName: existing.name,
-            piNumber: existing.piNumber || existing.projectId,
-            productionStartDate: new Date().toLocaleDateString('en-IN'),
-            appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-          })
+          try {
+            await sendProductionStartedEmail(existing.poc.email, {
+              pocName: existing.poc.name,
+              projectName: existing.name,
+              piNumber: existing.piNumber || existing.projectId,
+              productionStartDate: new Date().toLocaleDateString('en-IN'),
+              appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+            })
+          } catch (emailError) {
+            console.error("[EMAIL ERROR] Failed to send production started email:", emailError)
+          }
         }
       }
 
@@ -253,15 +235,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
         // Send Shipment Dispatched email to POC
         if (existing.poc?.email && dispatchExists) {
-          await sendShipmentDispatchedEmail(existing.poc.email, {
-            pocName: existing.poc.name,
-            projectName: existing.name,
-            piNumber: existing.piNumber || existing.projectId,
-            dispatchDate: new Date().toLocaleDateString('en-IN'),
-            courier: (dispatchExists as any).courier || "Courier Partner",
-            deliveryAddress: existing.location || "Multiple / Address",
-            appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-          })
+          try {
+            await sendShipmentDispatchedEmail(existing.poc.email, {
+              pocName: existing.poc.name,
+              projectName: existing.name,
+              piNumber: existing.piNumber || existing.projectId,
+              dispatchDate: new Date().toLocaleDateString('en-IN'),
+              courier: (dispatchExists as any).courier || "Courier Partner",
+              deliveryAddress: existing.location || "Multiple / Address",
+              appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+            })
+          } catch (emailError) {
+            console.error("[EMAIL ERROR] Failed to send shipment dispatched email:", emailError)
+          }
         }
       }
 
@@ -400,17 +386,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       }
     }
 
-    // Get all files associated with this project to delete from Cloudinary
+    // Get all files associated with this project to delete from S3
     const files = await prisma.fileUpload.findMany({
       where: { projectId: id },
     })
 
-    // Delete generated PI, POD, and uploaded documents from Cloudinary.
-    await deleteCloudinaryAsset(existing.piPdfUrl)
-    await deleteCloudinaryAsset(existing.dispatch?.podUrl)
+    // Delete generated PI, POD, and uploaded documents from S3.
+    await deleteS3Asset(existing.piPdfUrl)
+    await deleteS3Asset(existing.dispatch?.podUrl)
 
     for (const file of files) {
-      await deleteCloudinaryAsset(file.url)
+      await deleteS3Asset(file.url)
     }
 
     // Delete related activities

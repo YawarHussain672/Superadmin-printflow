@@ -17,10 +17,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 })
     }
 
-    console.log("[TEST EMAIL] Starting test email to:", email)
-    console.log("[TEST EMAIL] RESEND_API_KEY exists:", !!process.env.RESEND_API_KEY)
-    console.log("[TEST EMAIL] EMAIL_FROM:", process.env.EMAIL_FROM)
-    console.log("[TEST EMAIL] APP_URL:", APP_URL)
+    // Log current SMTP config (without the password)
+    const smtpConfig = {
+      host: process.env.MAIL_HOST || "(not set)",
+      port: process.env.MAIL_PORT || "587 (default)",
+      username: process.env.MAIL_USERNAME || "(not set)",
+      passwordSet: !!process.env.MAIL_PASSWORD,
+      from: process.env.MAIL_FROM_ADDRESS || "(not set)",
+    }
+    console.log("[TEST EMAIL] SMTP config:", smtpConfig)
+    console.log("[TEST EMAIL] Sending to:", email)
 
     try {
       const result = await sendWelcomeEmail(email, {
@@ -30,23 +36,40 @@ export async function POST(request: NextRequest) {
         role: "ADMIN",
         appUrl: APP_URL,
       })
-      
+
       console.log("[TEST EMAIL] Success:", result)
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: "Test email sent successfully",
-        result 
+        smtpConfig,
+        messageId: (result as { messageId?: string })?.messageId,
       })
     } catch (emailError) {
+      const err = emailError as NodeJS.ErrnoException & {
+        code?: string
+        responseCode?: number
+        response?: string
+        command?: string
+      }
       console.error("[TEST EMAIL] Failed:", emailError)
-      return NextResponse.json({ 
-        success: false, 
-        error: "Email sending failed",
-        details: emailError instanceof Error ? emailError.message : String(emailError)
-      }, { status: 500 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email sending failed",
+          smtpConfig,
+          details: {
+            message: err.message,
+            code: err.code,
+            smtpResponse: err.response,
+            smtpResponseCode: err.responseCode,
+            command: err.command,
+          },
+        },
+        { status: 500 }
+      )
     }
   } catch (error) {
     console.error("[TEST EMAIL] Route error:", error)
-    return NextResponse.json({ error: "Failed" }, { status: 500 })
+    return NextResponse.json({ error: "Internal error" }, { status: 500 })
   }
 }

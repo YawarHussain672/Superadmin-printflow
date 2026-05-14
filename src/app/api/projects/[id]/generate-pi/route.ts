@@ -4,49 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { generatePIPDF } from "@/lib/pi-generator"
 import { notifyAdminPIPending } from "@/lib/notifications"
-import { v2 as cloudinary } from "cloudinary"
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
-
-function getCloudinaryPublicIdFromUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-    const parts = parsed.pathname.split("/").filter(Boolean)
-    const uploadIndex = parts.indexOf("upload")
-    if (uploadIndex === -1) return null
-
-    const publicPathParts = parts.slice(uploadIndex + 1)
-    if (publicPathParts[0]?.match(/^v\d+$/)) {
-      publicPathParts.shift()
-    }
-
-    return decodeURIComponent(publicPathParts.join("/"))
-  } catch {
-    return null
-  }
-}
-
-async function deleteCloudinaryRawAsset(url: string | null | undefined) {
-  if (!url) return
-
-  const publicId = getCloudinaryPublicIdFromUrl(url)
-  if (!publicId) return
-
-  const publicIdWithoutExtension = publicId.replace(/\.[^/.]+$/, "")
-  for (const attempt of [publicId, publicIdWithoutExtension]) {
-    try {
-      const result = await cloudinary.uploader.destroy(attempt, { resource_type: "raw" })
-      if (result.result === "ok") return
-    } catch {
-      // Try the next public ID shape.
-    }
-  }
-}
+import { uploadToS3, deleteFromS3 as deleteS3Asset, getPresignedUrl } from "@/lib/s3"
 
 // Generate unique PI number
 async function generatePINumber(): Promise<string> {
@@ -98,7 +56,7 @@ export async function POST(
           select: { name: true, email: true, location: true },
         },
         client: {
-          select: { name: true, email: true, location: true, phone: true },
+          select: { name: true, email: true, location: true, phone: true, clientPan: true, clientGst: true },
         },
       },
     })
@@ -137,31 +95,16 @@ export async function POST(
       clientName: project.client?.name,
       clientEmail: project.client?.email,
       clientLocation: project.client?.location,
-      clientPan: project.client?.phone, // TODO: Add clientPan field to User model
-      clientGst: "", // TODO: Add clientGst field to User model
+      clientPan: project.client?.clientPan,
+      clientGst: project.client?.clientGst,
       deliveryAddress: `${project.location}${project.state ? `, ${project.state}` : ""}`,
       collaterals: project.collaterals,
       generatedAt: generatedAt,
     })
 
-    // Upload to Cloudinary
-    const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        {
-          resource_type: "raw",
-          folder: `axis-management/projects/${id}/pi`,
-          public_id: `${piNumber}`,
-          format: "pdf",
-        },
-        (error, result) => {
-          if (error || !result) {
-            reject(error || new Error("Upload failed"))
-          } else {
-            resolve(result as { secure_url: string })
-          }
-        }
-      ).end(pdfBuffer)
-    })
+    // Upload to S3
+    const s3Path = `projects/${id}/pi/${piNumber}.pdf`
+    const s3Url = await uploadToS3(pdfBuffer, s3Path, "application/pdf")
 
     // Update project with PI details
     const updatedProject = await prisma.project.update({
@@ -169,14 +112,14 @@ export async function POST(
       data: {
         piNumber: piNumber,
         piStatus: "PENDING",
-        piPdfUrl: uploadResult.secure_url,
+        piPdfUrl: s3Url,
         piGeneratedAt: generatedAt,
       },
     })
 
-    // Send admin notification (PI pending verification) — no email to POC at this stage
-    if (previousPiPdfUrl && previousPiPdfUrl !== uploadResult.secure_url) {
-      await deleteCloudinaryRawAsset(previousPiPdfUrl)
+    // Cleanup previous PI if it exists
+    if (previousPiPdfUrl && previousPiPdfUrl !== s3Url) {
+      await deleteS3Asset(previousPiPdfUrl)
     }
 
     await notifyAdminPIPending(
@@ -186,12 +129,15 @@ export async function POST(
       project.poc?.name || "Unknown"
     )
 
+    // Sign the URL so the client can view/download from the private bucket
+    const signedPiPdfUrl = await getPresignedUrl(s3Url)
+
     return NextResponse.json({
       success: true,
       project: {
         piNumber: piNumber,
         piStatus: "PENDING",
-        piPdfUrl: uploadResult.secure_url,
+        piPdfUrl: signedPiPdfUrl,
         piGeneratedAt: generatedAt,
       },
       message: "PI generated successfully. Pending admin verification.",

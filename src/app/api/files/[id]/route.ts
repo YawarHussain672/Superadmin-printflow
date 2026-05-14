@@ -3,13 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/audit"
-import { v2 as cloudinary } from "cloudinary"
-
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+import { deleteFromS3 } from "@/lib/s3"
 
 // DELETE /api/files/[id] - Delete a file
 export async function DELETE(
@@ -39,14 +33,17 @@ export async function DELETE(
       return NextResponse.json({ error: "Only admins can delete project documents" }, { status: 403 })
     }
 
-    // Delete from Cloudinary
+    // Delete from S3
     try {
-      const publicId = fileRecord.url.split("/").slice(-1)[0].split(".")[0]
-      if (publicId) {
-        await cloudinary.uploader.destroy(`axis-print/${fileRecord.projectId}/${fileRecord.type.toLowerCase()}/${publicId}`)
+      // Extract key from URL
+      // URL format: https://bucket.s3.region.amazonaws.com/key
+      const urlParts = fileRecord.url.split(".amazonaws.com/")
+      if (urlParts.length > 1) {
+        const key = decodeURIComponent(urlParts[1])
+        await deleteFromS3(key)
       }
-    } catch (cloudinaryError) {
-      // Continue to delete from database even if Cloudinary fails
+    } catch (s3Error) {
+      console.error("S3 deletion failed:", s3Error)
     }
 
     // Delete from database

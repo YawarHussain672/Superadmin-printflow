@@ -32,31 +32,54 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null
+          console.log("Auth Debug: Missing email or password");
+          throw new Error("Invalid credentials")
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        })
+        try {
+          console.log("Auth Debug: Attempting login for", credentials.email);
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email.toLowerCase(),
+            },
+          })
 
-        if (!user || !user.active) {
+          if (!user) {
+            console.log("Auth Debug: User not found");
+            return null
+          }
+
+          if (!user.password) {
+            console.log("Auth Debug: User has no password set");
+            return null
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
+
+          console.log("Auth Debug: Password valid:", isPasswordValid);
+
+          if (!isPasswordValid) {
+            return null
+          }
+
+          if (!user.active) {
+            console.log("Auth Debug: User is inactive");
+            return null
+          }
+
+          console.log("Auth Debug: Login successful for", user.email);
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
           return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
         }
       },
     }),

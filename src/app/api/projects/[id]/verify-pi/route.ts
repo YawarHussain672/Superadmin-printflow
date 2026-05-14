@@ -5,14 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { notifyPOCPIVerified, notifyPOCPIRejected } from "@/lib/notifications"
 import { sendPIGeneratedEmail } from "@/lib/email"
 import { formatCurrency } from "@/utils/formatters"
-import { v2 as cloudinary } from "cloudinary"
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+import { deleteFromS3 } from "@/lib/s3"
 
 // POST /api/projects/[id]/verify-pi
 export async function POST(
@@ -54,18 +47,16 @@ export async function POST(
     // Store PI number for activity log before potentially clearing it
     const piNumberForLog = project.piNumber
 
-    // If rejected, delete from Cloudinary
+    // If rejected, delete from S3
     if (action === "reject" && project.piPdfUrl) {
       try {
-        // Construct public_id: axis-management/projects/${id}/pi/${piNumber}
-        // Since it was uploaded as "raw" with format "pdf"
-        const publicId = `axis-management/projects/${id}/pi/${project.piNumber}.pdf`
-        console.log(`Attempting to delete PI from Cloudinary: ${publicId}`)
-        const result = await cloudinary.uploader.destroy(publicId, { resource_type: "raw" })
-        console.log("Cloudinary deletion result:", result)
-      } catch (cloudinaryError) {
-        console.error("Cloudinary deletion failed:", cloudinaryError)
-        // Continue update even if Cloudinary fails
+        const urlParts = project.piPdfUrl.split(".amazonaws.com/")
+        if (urlParts.length > 1) {
+          const key = decodeURIComponent(urlParts[1])
+          await deleteFromS3(key)
+        }
+      } catch (s3Error) {
+        console.error("S3 deletion failed:", s3Error)
       }
     }
 

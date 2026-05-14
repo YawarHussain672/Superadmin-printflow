@@ -7,9 +7,11 @@ const required = [
   "DATABASE_URL",
   "NEXTAUTH_URL",
   "NEXTAUTH_SECRET",
-  "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME",
-  "CLOUDINARY_API_KEY",
-  "CLOUDINARY_API_SECRET",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_DEFAULT_REGION",
+  "AWS_BUCKET",
+  "AWS_URL",
 ] as const
 
 export function validateEnv() {

@@ -108,16 +108,20 @@ export async function notifyAdminsNewApproval(projectId: string, projectName: st
     })
   ))
 
-  await Promise.all(admins.filter(a => a.email).map((admin) =>
-    sendAdminNewProjectEmail(admin.email!, {
-      adminName: admin.name || "Admin",
-      projectName,
-      projectId: projectIdStr,
-      pocName,
-      clientName,
-      appUrl,
-    })
-  ))
+  await Promise.all(admins.filter(a => a.email).map(async (admin) => {
+    try {
+      await sendAdminNewProjectEmail(admin.email!, {
+        adminName: admin.name || "Admin",
+        projectName,
+        projectId: projectIdStr,
+        pocName,
+        clientName,
+        appUrl,
+      })
+    } catch (emailError) {
+      console.error(`[EMAIL ERROR] Failed to send new project email to admin ${admin.email}:`, emailError)
+    }
+  }))
 }
 
 // Notify POC about PI rejected
@@ -214,14 +218,18 @@ export async function notifyAdminPIPending(
   )
 
   await Promise.all(
-    admins.filter((a) => a.email).map((admin) =>
-      sendAdminPIPendingEmail(admin.email!, {
-        adminName: admin.name || "Admin",
-        projectName,
-        piNumber,
-        pocName,
-        appUrl,
-      })
-    )
+    admins.filter((a) => a.email).map(async (admin) => {
+      try {
+        await sendAdminPIPendingEmail(admin.email!, {
+          adminName: admin.name || "Admin",
+          projectName,
+          piNumber,
+          pocName,
+          appUrl,
+        })
+      } catch (emailError) {
+        console.error(`[EMAIL ERROR] Failed to send PI pending email to admin ${admin.email}:`, emailError)
+      }
+    })
   )
 }

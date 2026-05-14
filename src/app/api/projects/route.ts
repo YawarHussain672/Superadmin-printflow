@@ -57,6 +57,8 @@ async function priceCollaterals(collaterals: Array<{ itemName: string; quantity:
   }
 }
 
+import { signProjectsUrls } from "@/lib/project-utils"
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -123,8 +125,10 @@ export async function GET(request: NextRequest) {
       prisma.project.groupBy({ by: ["location"], orderBy: { location: "asc" } }),
     ])
 
+    const signedProjects = await signProjectsUrls(projects as any);
+
     return NextResponse.json({
-      projects,
+      projects: signedProjects,
       total,
       page,
       limit,
@@ -268,18 +272,22 @@ export async function POST(request: NextRequest) {
       data: { projectId: project.id, requestedById: session.user.id, status: "PENDING" },
     })
 
-    // Post-creation notifications (non-critical - don't fail if they error)
+    // Post-creation notifications — each step is independently wrapped so one failure
+    // cannot silently block admin email dispatch.
+    console.log(`[PROJECT CREATED] Running post-creation notifications for ${project.projectId}`)
+
+    // Step A: Pusher real-time triggers
     try {
-      // Notify all clients via Pusher
       await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_CREATED, { id: project.id })
       await pusherServer.trigger(CHANNELS.DASHBOARD, EVENTS.STATS_UPDATED, {})
       await pusherServer.trigger(CHANNELS.APPROVALS, EVENTS.APPROVAL_UPDATED, {})
+      console.log(`[PROJECT CREATED] Pusher triggers sent for ${project.projectId}`)
+    } catch (pusherError) {
+      console.error(`[PROJECT CREATED] Pusher trigger failed (non-critical):`, pusherError)
+    }
 
-      // Get the assigned user (POC or Client) for notifications
-      const assignedUser = project.poc || project.client
-      const assignedUserId = pocId || clientId
-
-      // Log activity (use session user as the actor since they're the one requesting)
+    // Step B: Activity log
+    try {
       await logActivity({
         userId: session.user.id,
         action: "PROJECT_CREATED",
@@ -287,13 +295,25 @@ export async function POST(request: NextRequest) {
         entityId: project.id,
         details: { projectId: project.projectId, name: project.name, location, clientSubtotal: totalCost, totalCost: project.totalCost, pocId, clientId },
       })
+      console.log(`[PROJECT CREATED] Activity logged for ${project.projectId}`)
+    } catch (auditError) {
+      console.error(`[PROJECT CREATED] Activity log failed (non-critical):`, auditError)
+    }
 
-      // Notify all admins of new approval request
+    // Step C: Notify all admins via DB notification + email
+    try {
       const pocName = project.poc?.name || "A user"
       const clientName = project.client?.name
+      console.log(`[PROJECT CREATED] Sending admin notifications → pocName="${pocName}" clientName="${clientName}"`)
       await notifyAdminsNewApproval(project.id, project.name, project.projectId, pocName, clientName)
+      console.log(`[PROJECT CREATED] Admin notifications completed for ${project.projectId}`)
+    } catch (notifyError) {
+      console.error(`[PROJECT CREATED] Admin notification/email failed:`, notifyError)
+    }
 
-      // Notify the assigned user (POC or CLIENT) that a project was created for them
+    // Step D: Notify the assigned user (POC or CLIENT)
+    try {
+      const assignedUserId = pocId || clientId
       if (assignedUserId) {
         await createNotification({
           userId: assignedUserId,
@@ -302,9 +322,10 @@ export async function POST(request: NextRequest) {
           type: "project_assigned",
           link: `/projects/${project.id}`,
         })
+        console.log(`[PROJECT CREATED] Assigned-user notification sent → userId=${assignedUserId}`)
       }
-    } catch (notifyError) {
-      // Log but don't fail - project is already created
+    } catch (assignError) {
+      console.error(`[PROJECT CREATED] Assigned-user notification failed:`, assignError)
     }
 
     return NextResponse.json(project, { status: 201 })

@@ -18,7 +18,7 @@ A high-performance print project management system built for Axis. Manages the c
 | **Project Engine** | Full CRUD for print projects with support for multiple collateral types per project |
 | **Approval Workflow** | Streamlined review process with status tracking and automated reminders |
 | **Smart Dispatch** | Bulk courier data integration via Excel, real-time tracking IDs, and POD management |
-| **Digital Vault** | Cloudinary-powered storage for POs, Challans, and Tax Invoices |
+| **Digital Vault** | AWS S3-powered storage for POs, Challans, and Tax Invoices |
 | **Dynamic Rate Card** | Real-time pricing management for different paper types and print quantities |
 | **Team Hub** | Centralized user management with status toggles and role assignments |
 | **Advanced Analytics** | Interactive Recharts visualizations for spend analysis and volume trends |
@@ -34,7 +34,7 @@ A high-performance print project management system built for Axis. Manages the c
 - **ORM** — [Prisma 6](https://www.prisma.io/)
 - **Auth** — [NextAuth.js v4](https://next-auth.js.org/)
 - **Design** — [Tailwind CSS v4](https://tailwindcss.com/) + [Radix UI](https://www.radix-ui.com/)
-- **Assets** — [Cloudinary](https://cloudinary.com/) (Documents & PODs)
+- **Assets** — [AWS S3](https://aws.amazon.com/s3/) (Documents & PODs)
 - **Real-time** — [Pusher](https://pusher.com/) (Notifications)
 - **Reports** — jsPDF & ExcelJS
 
@@ -46,7 +46,7 @@ A high-performance print project management system built for Axis. Manages the c
 
 - Node.js 18+ (Node 20+ recommended)
 - A Neon PostgreSQL instance
-- A Cloudinary account
+- An AWS S3 Bucket and IAM credentials
 
 ### 1. Clone & Install
 
@@ -65,7 +65,7 @@ cp .env.example .env.local
 Configure the following in `.env.local`:
 - `DATABASE_URL`: Your Neon connection string
 - `NEXTAUTH_SECRET`: Generate using `openssl rand -base64 32`
-- `CLOUDINARY_*`: Your Cloudinary credentials
+- `AWS_*`: Your S3 bucket and IAM credentials
 - `PUSHER_*`: (Optional) For real-time updates
 
 ### 3. Database Initialization

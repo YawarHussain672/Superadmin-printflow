@@ -68,6 +68,7 @@ export function PodUploadButton({ dispatchId, podUrl }: PodUploadButtonProps) {
             try {
               const res = await fetch(`/api/dispatch/${dispatchId}/pod/view`)
               if (!res.ok) throw new Error("Download failed")
+              // The route redirects to a presigned S3 URL; get the final URL
               const blob = await res.blob()
               const url = window.URL.createObjectURL(blob)
               const a = document.createElement("a")
