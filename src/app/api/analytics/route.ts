@@ -23,23 +23,44 @@ export async function GET() {
       leadStats,
       branchData,
     ] = await Promise.all([
-      prisma.project.count(),
-      prisma.project.count({ where: { status: ProjectStatus.DELIVERED } }),
-      prisma.project.count({ where: { status: { not: ProjectStatus.DELIVERED } } }),
-      prisma.project.aggregate({ _sum: { totalCost: true } }),
+      prisma.project.count({
+        where: { approval: { status: "APPROVED" } }
+      }),
+      prisma.project.count({
+        where: {
+          status: ProjectStatus.DELIVERED,
+          approval: { status: "APPROVED" }
+        }
+      }),
+      prisma.project.count({
+        where: {
+          status: { not: ProjectStatus.DELIVERED },
+          approval: { status: "APPROVED" }
+        }
+      }),
+      prisma.project.aggregate({
+        _sum: { totalCost: true },
+        where: {
+          approval: { status: "APPROVED" },
+          status: { not: ProjectStatus.CANCELLED }
+        }
+      }),
       prisma.project.groupBy({
         by: ["status"],
+        where: { approval: { status: "APPROVED" } },
         _count: { id: true },
         _sum: { totalCost: true },
       }),
       prisma.project.groupBy({
         by: ["location"],
+        where: { approval: { status: "APPROVED" } },
         _count: { id: true },
         _sum: { totalCost: true },
         orderBy: { _sum: { totalCost: "desc" } },
       }),
       prisma.collateral.groupBy({
         by: ["itemName"],
+        where: { project: { approval: { status: "APPROVED" } } },
         _count: { id: true },
         _sum: { totalPrice: true, quantity: true },
         orderBy: { _sum: { totalPrice: "desc" } },
@@ -47,20 +68,23 @@ export async function GET() {
       }),
       prisma.$queryRaw<Array<{ month: string; count: bigint; spend: number }>>`
         SELECT
-          TO_CHAR("createdAt", 'Mon YYYY') as month,
-          COUNT(id) as count,
-          COALESCE(SUM("totalCost"), 0) as spend
-        FROM projects
-        GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
-        ORDER BY DATE_TRUNC('month', "createdAt") DESC
+          TO_CHAR(p."createdAt", 'Mon YYYY') as month,
+          COUNT(p.id) as count,
+          COALESCE(SUM(CASE WHEN p.status != 'CANCELLED' THEN p."totalCost" ELSE 0 END), 0) as spend
+        FROM projects p
+        INNER JOIN approvals a ON a."projectId" = p.id
+        WHERE a.status = 'APPROVED'
+        GROUP BY TO_CHAR(p."createdAt", 'Mon YYYY'), DATE_TRUNC('month', p."createdAt")
+        ORDER BY DATE_TRUNC('month', p."createdAt") DESC
         LIMIT 12
       `,
       prisma.$queryRaw<Array<{ total_leads: bigint; total_converted: bigint }>>`
         SELECT
-          COALESCE(SUM("leadsGenerated"), 0) as total_leads,
-          COALESCE(SUM("leadsConverted"), 0) as total_converted
-        FROM projects
-        WHERE "leadsGenerated" IS NOT NULL
+          COALESCE(SUM(p."leadsGenerated"), 0) as total_leads,
+          COALESCE(SUM(p."leadsConverted"), 0) as total_converted
+        FROM projects p
+        INNER JOIN approvals a ON a."projectId" = p.id
+        WHERE p."leadsGenerated" IS NOT NULL AND a.status = 'APPROVED'
       `,
       // Branch-wise marketing data - only show branches with real project data
       prisma.$queryRaw<Array<{
@@ -75,11 +99,12 @@ export async function GET() {
           COUNT(p.id) as campaigns,
           COALESCE(SUM(p."leadsGenerated"), 0) as leads_generated,
           COALESCE(SUM(p."leadsConverted"), 0) as conversions,
-          COALESCE(SUM(p."totalCost"), 0) as marketing_spend
+          COALESCE(SUM(CASE WHEN p.status != 'CANCELLED' THEN p."totalCost" ELSE 0 END), 0) as marketing_spend
         FROM projects p
-        WHERE p.branch IS NOT NULL AND p.branch != ''
+        INNER JOIN approvals a ON a."projectId" = p.id
+        WHERE p.branch IS NOT NULL AND p.branch != '' AND a.status = 'APPROVED'
         GROUP BY p.branch
-        ORDER BY COALESCE(SUM(p."totalCost"), 0) DESC
+        ORDER BY COALESCE(SUM(CASE WHEN p.status != 'CANCELLED' THEN p."totalCost" ELSE 0 END), 0) DESC
       `,
     ])
 

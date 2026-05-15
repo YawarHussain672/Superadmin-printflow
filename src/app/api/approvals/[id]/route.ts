@@ -97,7 +97,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             projectName: approval.project.name,
             projectId: approval.project.projectId,
             location: approval.project.location,
-            totalCost: formatCurrency(approval.project.totalCost),
+            totalCost: formatCurrency(approval.project.grandTotal),
             appUrl: APP_URL,
           })
         } catch (emailError) {
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             projectName: approval.project.name,
             piNumber: approval.project.piNumber || approval.project.projectId,
             piDate: new Date(approval.project.createdAt).toLocaleDateString('en-IN'),
-            piAmount: formatCurrency(approval.project.totalCost),
+            piAmount: formatCurrency(approval.project.grandTotal),
             appUrl: APP_URL,
           })
         } catch (emailError) {

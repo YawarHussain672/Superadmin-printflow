@@ -100,7 +100,7 @@ export async function POST(
           projectName: project.name,
           piNumber: piNumberForLog,
           piDate: new Date().toLocaleDateString("en-IN"),
-          piAmount: formatCurrency(project.totalCost),
+          piAmount: formatCurrency(project.grandTotal),
           appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
         })
       }
