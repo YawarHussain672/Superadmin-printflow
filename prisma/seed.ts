@@ -680,7 +680,8 @@ async function main() {
   ]
 
   for (let i = 0; i < projectTemplates.length; i++) {
-    const proj = projectTemplates[i]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const proj = projectTemplates[i] as any
     const year = today.getFullYear()
     const projectId = `PRJ-${year}-${100 + i}`
     const piNumber = (2000 + i).toString()
