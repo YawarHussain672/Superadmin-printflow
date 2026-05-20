@@ -753,7 +753,7 @@ async function main() {
 
     // Add POD file URL to dispatch if dispatch exists
     if (proj.dispatch) {
-      const podFile = proj.files?.find(f => f.type === "POD")
+      const podFile = proj.files?.find((f: { type: string }) => f.type === "POD")
       if (podFile) {
         await prisma.dispatch.update({
           where: { projectId: project.id },
