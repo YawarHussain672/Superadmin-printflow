@@ -98,6 +98,9 @@ export async function POST(
       clientPan: project.client?.clientPan,
       clientGst: project.client?.clientGst,
       deliveryAddress: `${project.location}${project.state ? `, ${project.state}` : ""}`,
+      recipientName: project.recipientName,
+      recipientContact: project.recipientContact,
+      recipientBranch: project.recipientBranch,
       collaterals: project.collaterals,
       generatedAt: generatedAt,
     })

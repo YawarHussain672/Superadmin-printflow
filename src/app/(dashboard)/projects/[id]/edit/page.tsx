@@ -54,7 +54,7 @@ export default function EditProjectPage() {
           { location: "Mumbai", state: "Maharashtra" }, { location: "Delhi", state: "Delhi" },
           { location: "Bangalore", state: "Karnataka" }, { location: "Chennai", state: "Tamil Nadu" },
           { location: "Pune", state: "Maharashtra" }, { location: "Hyderabad", state: "Telangana" },
-          { location: "Kolkata", state: "West Bengal" }, { location: "Gurgaon", state: "Haryana" },
+          { location: "Kolkata", state: "West Bengal" }, { location: "Gurugram", state: "Haryana" },
           { location: "Noida", state: "Uttar Pradesh" }, { location: "Ahmedabad", state: "Gujarat" },
           { location: "Jaipur", state: "Rajasthan" }, { location: "Lucknow", state: "Uttar Pradesh" },
         ]

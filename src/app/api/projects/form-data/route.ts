@@ -20,7 +20,7 @@ export async function GET() {
   const [pocs, rateCards] = await Promise.all([
     prisma.user.findMany({
       where: userWhere,
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, phone: true, location: true, branch: true },
       orderBy: { name: "asc" },
     }),
     prisma.rateCard.findMany({

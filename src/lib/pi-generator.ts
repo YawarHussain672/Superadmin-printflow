@@ -1,5 +1,6 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import sharp from "sharp"
 
 interface CollateralItem {
   itemName: string
@@ -28,6 +29,9 @@ interface ProjectData {
   clientPan?: string | null
   clientGst?: string | null
   deliveryAddress?: string | null
+  recipientName?: string | null
+  recipientContact?: string | null
+  recipientBranch?: string | null
   collaterals: CollateralItem[]
   generatedAt: Date
 }
@@ -42,7 +46,44 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFont("times", "normal")
 
   // === HEADER SECTION ===
-  
+
+  // Add logo in top left (purple color) - smaller size
+  try {
+    const fs = await import('fs')
+    const path = await import('path')
+    const svgPath = path.join(process.cwd(), 'rm-white-logo3.svg')
+    const pngPath = path.join(process.cwd(), 'rm-white-logo3.png')
+
+    // Delete cached PNG if it exists to ensure we use the updated purple SVG
+    if (fs.existsSync(pngPath)) {
+      fs.unlinkSync(pngPath)
+    }
+
+    // Convert SVG to PNG with proper background handling
+    if (fs.existsSync(svgPath)) {
+      await sharp(svgPath)
+        .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
+        .recomb([
+          [0.5, 0, 0.5],
+          [0, 0, 0],
+          [0.5, 0, 0.5]
+        ])
+        .png()
+        .toFile(pngPath)
+
+      const logoData = fs.readFileSync(pngPath)
+      const base64Image = logoData.toString('base64')
+      doc.addImage(base64Image, 'PNG', 10, 4.5, 30, 15)
+    }
+  } catch (error) {
+    // If logo processing fails, use purple text fallback
+    doc.setFontSize(10)
+    doc.setTextColor(128, 0, 128)
+    doc.setFont("times", "bold")
+    doc.text("RISHIRAJ MEDIA", 12, 15)
+    doc.setTextColor(0, 0, 0)
+  }
+
   // Title: PROFORMA INVOICE (centered, bold, serif)
   doc.setFontSize(18)
   doc.setFont("times", "bold")
@@ -61,7 +102,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFont("times", "bold")
   doc.setFontSize(10)
   doc.text("Customer", 12, detailsY + 6)
-  
+
   doc.setFont("times", "normal")
   doc.setFontSize(9)
   let custY = detailsY + 13
@@ -87,15 +128,15 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFontSize(9)
   const labelX = rightBoxX + 2
   const valueX = rightBoxX + 35
-  
+
   doc.text("No.", labelX, detailsY + 13)
   doc.text(project.piNumber, valueX, detailsY + 13)
-  
+
   doc.text("Date:-", labelX, detailsY + 18)
   doc.text(project.generatedAt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }), valueX, detailsY + 18)
-  
+
   doc.text("Revise Date", labelX, detailsY + 23)
-  
+
   doc.text("Job Name :-", labelX, detailsY + 28)
   doc.setFont("times", "bold")
   doc.text(project.name, valueX, detailsY + 28)
@@ -103,7 +144,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   const jobNameWidth = doc.getTextWidth(project.name)
   doc.setLineWidth(0.1)
   doc.line(valueX, detailsY + 29, valueX + jobNameWidth, detailsY + 29)
-  
+
   doc.setFont("times", "normal")
   doc.text("Contact Person:-", labelX, detailsY + 33)
   doc.text(project.pocName || "", valueX, detailsY + 33)
@@ -113,7 +154,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   // Customer Rect
   doc.rect(10, detailsY, colWidth, boxHeight)
   doc.line(10, detailsY + 8, 10 + colWidth, detailsY + 8) // Header line
-  
+
   // Proforma Rect
   doc.rect(10 + colWidth, detailsY, colWidth, boxHeight)
   doc.line(10 + colWidth, detailsY + 8, 10 + colWidth * 2, detailsY + 8) // Header line
@@ -127,7 +168,9 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.text("Delivery Address", 12, secondRowY + 6)
   doc.setFont("times", "normal")
   doc.setFontSize(9)
-  if (project.deliveryAddress) {
+  if (project.recipientBranch) {
+    doc.text(project.recipientBranch, 12, secondRowY + 12)
+  } else if (project.deliveryAddress) {
     doc.text(project.deliveryAddress, 12, secondRowY + 12)
   }
   doc.rect(10, secondRowY, colWidth, secondRowHeight)
@@ -286,7 +329,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFont("times", "bold")
   doc.setFontSize(10)
   doc.text("Terms:", 12, termsY + 6)
-  
+
   doc.setFont("times", "normal")
   doc.setFontSize(8.5)
   const terms = [
@@ -296,13 +339,13 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
     "4- All cheques should be made in favour of RISHIRAJ MEDIA.",
     "5- All payments should be supported with payments advise.",
   ]
-  
+
   let currentTermY = termsY + 12
   for (const term of terms) {
     doc.text(term, 12, currentTermY)
     currentTermY += 4.5
   }
-  
+
   // Terms box - tall enough to contain all 5 lines
   doc.rect(10, termsY, pageWidth - 20, 36)
 

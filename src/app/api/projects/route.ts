@@ -13,6 +13,7 @@ import { calculateTotal } from "@/lib/ratecard"
 
 const createProjectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters").max(200),
+  description: z.string().max(1000).optional(),
   pocId: z.string().min(1, "POC is required"),
   clientId: z.string().optional().nullable(),
   location: z.string().min(1, "Location is required"),
@@ -23,6 +24,9 @@ const createProjectSchema = z.object({
   packingCharges: z.number().min(0).default(0),
   packingChargesGstRate: z.number().min(0).max(100).default(18),
   totalCost: z.number().min(0).optional(),
+  recipientName: z.string().optional(),
+  recipientContact: z.string().optional(),
+  recipientBranch: z.string().optional(),
   leadsGenerated: z.number().int().min(0).nullable().optional(),
   leadsConverted: z.number().int().min(0).nullable().optional(),
   collaterals: z.array(z.object({
@@ -158,7 +162,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { name, pocId, clientId, location, branch, state, deliveryDate, instructions, packingCharges, packingChargesGstRate, collaterals, totalCost, leadsGenerated, leadsConverted } = parsed.data
+    const { name, description, pocId, clientId, location, branch, state, deliveryDate, instructions, packingCharges, packingChargesGstRate, collaterals, totalCost, recipientName, recipientContact, recipientBranch, leadsGenerated, leadsConverted } = parsed.data
 
     // POC is required
     if (!pocId) {
@@ -220,13 +224,13 @@ export async function POST(request: NextRequest) {
     const year = new Date().getFullYear()
     const random = Math.floor(Math.random() * 900) + 100
     const projectId = `PRJ-${year}-${random}`
-    
+
     // Calculate totals
     const collateralsSubtotal = priced.subtotal
     const collateralsGst = priced.totalGst
     const packingSubtotal = packingCharges || 0
     const packingGst = packingSubtotal * (packingChargesGstRate / 100)
-    
+
     const totalSubtotal = collateralsSubtotal + packingSubtotal
     const totalGrandTotal = collateralsSubtotal + collateralsGst + packingSubtotal + packingGst
 
@@ -234,6 +238,7 @@ export async function POST(request: NextRequest) {
       data: {
         projectId,
         name,
+        description,
         pocId,
         clientId,
         location,
@@ -245,6 +250,9 @@ export async function POST(request: NextRequest) {
         packingChargesGstRate: packingChargesGstRate,
         totalCost: totalSubtotal,
         grandTotal: totalGrandTotal,
+        recipientName,
+        recipientContact,
+        recipientBranch,
         leadsGenerated,
         leadsConverted,
         collaterals: {

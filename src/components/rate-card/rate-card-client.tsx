@@ -317,7 +317,7 @@ export function RateCardClient({ initialItems }: RateCardClientProps) {
                   <td><strong>{item.itemName}</strong></td>
                   <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{item.subcategory || '-'}</td>
                   <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{item.specification}</td>
-                  <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{item.gstRate || 18}%</td>
+                  <td style={{ fontSize: '13px', color: 'var(--gray-600)' }}>{item.gstRate ?? 18}%</td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {getSlabs(item).slice(0, 4).map((slab, idx) => (

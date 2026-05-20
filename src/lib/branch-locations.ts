@@ -39,7 +39,7 @@ export const BRANCH_LOCATIONS: Record<string, { state: string; branches: string[
     state: "Uttar Pradesh",
     branches: ["Main Branch", "Indirapuram Branch", "Raj Nagar Branch"],
   },
-  Gurgaon: {
+  Gurugram: {
     state: "Haryana",
     branches: ["Main Branch", "Sector 14 Branch", "Sector 29 Branch", "DLF Phase 1 Branch"],
   },

@@ -48,7 +48,7 @@ interface CollateralItem {
   totalPrice: number
   gstRate?: number
 }
-interface POC { id: string; name: string; email: string; role?: string }
+interface POC { id: string; name: string; email: string; role?: string; phone?: string; location?: string; branch?: string }
 interface RateCardItem { id: string; name: string; defaultPrice: number; volumeSlabs: VolumeSlab[]; gstRate?: number }
 
 interface NewProjectFormProps {
@@ -65,7 +65,8 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
   const [pocs, setPocs] = useState<POC[]>([])
   const [rateCards, setRateCards] = useState<RateCardItem[]>([])
   const [formData, setFormData] = useState({
-    name: "", pocId: "", clientId: "", city: "", branch: "", deliveryDate: "", instructions: "", packingCharges: "", packingChargesGstRate: "18",
+    name: "", description: "", pocId: "", clientId: "", city: "", branch: "", deliveryDate: "", instructions: "", packingCharges: "", packingChargesGstRate: "18",
+    recipientName: "", recipientContact: "", recipientBranch: "", sameAsPoc: false,
   })
   const [showPackingForm, setShowPackingForm] = useState(false)
 
@@ -190,6 +191,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
+          description: formData.description,
           pocId: formData.pocId || undefined,
           clientId: formData.clientId || undefined,
           location: formData.city,
@@ -199,6 +201,9 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
           instructions: formData.instructions,
           packingCharges: packingCharges,
           packingChargesGstRate: packingChargesGstRate,
+          recipientName: formData.recipientName || undefined,
+          recipientContact: formData.recipientContact || undefined,
+          recipientBranch: formData.recipientBranch || undefined,
           collaterals: collaterals.filter((c) => c.itemName && c.quantity > 0),
           totalCost: totalCost,
         }),
@@ -262,14 +267,20 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                       className={`form-select ${errors.pocId ? 'border-red-400' : ''}`}
                       value={formData.pocId}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                        setFormData({ ...formData, pocId: e.target.value });
+                        const selectedPoc = pocs.find(p => p.id === e.target.value)
+                        setFormData({
+                          ...formData,
+                          pocId: e.target.value,
+                          city: selectedPoc?.location || formData.city,
+                          branch: selectedPoc?.branch || formData.branch,
+                        });
                         setErrors({ ...errors, pocId: "" })
                       }}
                       disabled={isFetching}
                     >
                       <option value="">{isFetching ? "Loading..." : "Select POC"}</option>
                       {pocs.filter(p => p.role === 'POC').map((poc) => (
-                        <option key={poc.id} value={poc.id}>{poc.name}</option>
+                        <option key={poc.id} value={poc.id}>{poc.name}{poc.branch ? ` (${poc.branch})` : ''}</option>
                       ))}
                     </select>
                     {errors.pocId && <p style={{ fontSize: '13px', color: 'var(--color-error)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}><AlertIcon /> {errors.pocId}</p>}
@@ -347,6 +358,18 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                   style={{ background: 'var(--gray-100)' }}
                   value={cityData?.state || ''}
                   placeholder="State"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <textarea
+                  className="form-input"
+                  value={formData.description}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => { setFormData({ ...formData, description: e.target.value }) }}
+                  placeholder="Enter project description (optional)"
+                  rows={2}
+                  style={{ resize: 'vertical' }}
                 />
               </div>
             </div>
@@ -515,6 +538,82 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
           />
         </div>
 
+        {/* Recipient Details */}
+        <div className="card" style={{ marginBottom: '24px' }}>
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <label style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-700)' }}>Recipient Details (Optional)</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--gray-600)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.sameAsPoc}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const checked = e.target.checked
+                    setFormData({ ...formData, sameAsPoc: checked })
+                    if (checked) {
+                      const selectedPoc = pocs.find(p => p.id === formData.pocId)
+                      if (selectedPoc) {
+                        setFormData({
+                          ...formData,
+                          sameAsPoc: true,
+                          recipientName: selectedPoc.name,
+                          recipientContact: selectedPoc.email,
+                          recipientBranch: formData.branch,
+                        })
+                      }
+                    } else {
+                      setFormData({
+                        ...formData,
+                        sameAsPoc: false,
+                        recipientName: "",
+                        recipientContact: "",
+                        recipientBranch: "",
+                      })
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                Same as POC
+              </label>
+            </div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">Recipient Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.recipientName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, recipientName: e.target.value })}
+                  placeholder="Enter recipient name"
+                  disabled={formData.sameAsPoc}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Recipient Contact</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.recipientContact}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, recipientContact: e.target.value })}
+                  placeholder="Enter contact number/email"
+                  disabled={formData.sameAsPoc}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Recipient Branch/Address</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.recipientBranch}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, recipientBranch: e.target.value })}
+                  placeholder="Enter branch/address"
+                  disabled={formData.sameAsPoc}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Cost Summary with GST Breakdown */}
         <div className="card" style={{ marginBottom: '24px', background: 'rgba(224, 242, 254, 0.3)', border: '1px solid rgba(186, 230, 253, 0.5)' }}>
           <div style={{ padding: '24px' }}>
@@ -522,12 +621,6 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
               <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gray-700)' }}>Subtotal (Items):</span>
               <Currency amount={subtotal} size="15px" color="var(--gray-800)" />
             </div>
-            {packingCharges > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-600)' }}>Packing Charges:</span>
-                <Currency amount={packingCharges} size="14px" color="var(--gray-700)" />
-              </div>
-            )}
             {/* Items GST */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-600)' }}>

@@ -233,7 +233,7 @@ export function ProjectsPageClient() {
             <option value="Delhi">Delhi</option>
             <option value="Faridabad">Faridabad</option>
             <option value="Ghaziabad">Ghaziabad</option>
-            <option value="Gurgaon">Gurgaon</option>
+            <option value="Gurugram">Gurugram</option>
             <option value="Hyderabad">Hyderabad</option>
             <option value="Indore">Indore</option>
             <option value="Jaipur">Jaipur</option>

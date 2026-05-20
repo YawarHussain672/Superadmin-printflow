@@ -37,6 +37,7 @@ model Project {
   id                    String          @id @default(cuid())
   projectId             String          @unique
   name                  String
+  description           String?
   piNumber              String?
   piStatus              String? // PENDING, VERIFIED, REJECTED — null until PI is generated
   piPdfUrl              String?
@@ -57,6 +58,9 @@ model Project {
   pocId                 String?
   clientId              String?
   branch                String?
+  recipientName         String?
+  recipientContact      String?
+  recipientBranch       String?
   leadsConverted        Int?
   leadsGenerated        Int?
   approval              Approval?
