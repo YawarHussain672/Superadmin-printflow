@@ -763,7 +763,7 @@ async function main() {
     }
 
     // Create approval for all projects
-    let appStatus = ApprovalStatus.PENDING
+    let appStatus: ApprovalStatus = ApprovalStatus.PENDING
     if (proj.status === ProjectStatus.CANCELLED) {
       appStatus = ApprovalStatus.REJECTED
     } else if (proj.status !== ProjectStatus.REQUESTED) {
