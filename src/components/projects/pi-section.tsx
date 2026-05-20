@@ -73,6 +73,7 @@ export function PISection({
         setPiPdfUrl(data.project.piPdfUrl)
         setPiGeneratedAt(data.project.piGeneratedAt)
         toast.success(data.message)
+        router.refresh()
       } else {
         toast.error(data.error || "Failed to generate PI")
       }
@@ -99,6 +100,7 @@ export function PISection({
         setPiStatus(data.project.piStatus)
         setPiVerifiedAt(data.project.piVerifiedAt)
         toast.success(data.message)
+        router.refresh()
       } else {
         toast.error(data.error || "Failed to verify PI")
       }
@@ -129,6 +131,7 @@ export function PISection({
         setShowRejectDialog(false)
         setRejectNotes("")
         toast.success(data.message)
+        router.refresh()
       } else {
         toast.error(data.error || "Failed to reject PI")
       }
@@ -357,17 +360,17 @@ export function PISection({
 
         {/* Row 2: Admin Verification Buttons */}
         {isAdmin && piStatus === "PENDING" && piPdfUrl && (
-          <div 
-            style={{ 
-              display: "flex", 
-              alignItems: "center", 
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
               justifyContent: "space-between",
-              gap: "12px", 
-              padding: "12px", 
+              gap: "12px",
+              padding: "12px",
               marginTop: "12px",
               background: "#f8fafc",
               border: "1px solid #e2e8f0",
-              borderRadius: "8px" 
+              borderRadius: "8px"
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
