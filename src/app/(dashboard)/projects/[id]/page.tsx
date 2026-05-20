@@ -63,6 +63,7 @@ interface Project {
   id: string
   projectId: string
   name: string
+  description: string | null
   status: ProjectStatus
   piNumber: string | null
   piStatus: string | null
@@ -420,6 +421,18 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             <span className="detail-label">Delivery Address</span>
             <span className="detail-value">Axis Max Life Insurance, {project.location}, {project.state}, India</span>
           </div>
+          {project.description && (
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Description</span>
+              <span className="detail-value">{project.description}</span>
+            </div>
+          )}
+          {project.instructions && (
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Special Instructions</span>
+              <span className="detail-value">{project.instructions}</span>
+            </div>
+          )}
         </div>
       </div>
 

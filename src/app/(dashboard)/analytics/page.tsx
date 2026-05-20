@@ -364,8 +364,17 @@ export default function AnalyticsPage() {
               const maxCount = Math.max(...data.projectsByLocation.map(l => l._count.id), 1)
               const percentage = Math.round((loc._count.id / maxCount) * 100)
               return (
-                <div key={loc.location} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span style={{ fontWeight: 600, color: "#374151", width: "80px", fontSize: "14px" }}>{loc.location}</span>
+                <div key={loc.location} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{
+                    fontWeight: 600,
+                    color: "#374151",
+                    width: "110px",
+                    minWidth: "110px",
+                    fontSize: "13px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }} title={loc.location}>{loc.location}</span>
                   <div style={{ flex: 1, height: "10px", background: "#f3f4f6", borderRadius: "5px", overflow: "hidden" }}>
                     <div
                       style={{

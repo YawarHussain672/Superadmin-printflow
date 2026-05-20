@@ -49,37 +49,28 @@ const RupeeIcon = () => (
 )
 
 async function getDashboardStats(projectFilter: Prisma.ProjectWhereInput) {
-  const [
-    totalProjects,
-    pendingApproval,
-    inProduction,
-    inTransit,
-    delivered,
-    cancelled,
-    totalSpend,
-    recentProjects,
-  ] = await Promise.all([
-    prisma.project.count({ where: projectFilter }),
-    prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.REQUESTED } }),
-    prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.PRINTING } }),
-    prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.DISPATCHED } }),
-    prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.DELIVERED } }),
-    prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.CANCELLED } }),
-    prisma.project.aggregate({ 
-      where: { 
-        ...projectFilter, 
-        status: { not: ProjectStatus.CANCELLED },
-        approval: { status: ApprovalStatus.APPROVED }
-      }, 
-      _sum: { totalCost: true, grandTotal: true } 
-    }),
-    prisma.project.findMany({
-      where: projectFilter,
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: { poc: { select: { name: true, role: true } }, client: { select: { name: true, role: true } } },
-    }),
-  ])
+  const totalProjects = await prisma.project.count({ where: projectFilter })
+  const pendingApproval = await prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.REQUESTED } })
+  const inProduction = await prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.PRINTING } })
+  const inTransit = await prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.DISPATCHED } })
+  const delivered = await prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.DELIVERED } })
+  const cancelled = await prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.CANCELLED } })
+  
+  const totalSpend = await prisma.project.aggregate({ 
+    where: { 
+      ...projectFilter, 
+      status: { not: ProjectStatus.CANCELLED },
+      approval: { status: ApprovalStatus.APPROVED }
+    }, 
+    _sum: { totalCost: true, grandTotal: true } 
+  })
+
+  const recentProjects = await prisma.project.findMany({
+    where: projectFilter,
+    take: 5,
+    orderBy: { createdAt: "desc" },
+    include: { poc: { select: { name: true, role: true } }, client: { select: { name: true, role: true } } },
+  })
 
   const totalSpendWithGST = totalSpend._sum.grandTotal || 0
   const totalBaseCost = totalSpend._sum.totalCost || 0
