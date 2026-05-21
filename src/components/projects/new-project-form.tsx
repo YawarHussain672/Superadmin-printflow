@@ -47,6 +47,7 @@ interface CollateralItem {
   unitPrice: number
   totalPrice: number
   gstRate?: number
+  specification?: string
 }
 interface POC { id: string; name: string; email: string; role?: string; phone?: string; location?: string; branch?: string }
 interface RateCardItem { id: string; name: string; defaultPrice: number; volumeSlabs: VolumeSlab[]; gstRate?: number }
@@ -65,13 +66,56 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
   const [pocs, setPocs] = useState<POC[]>([])
   const [rateCards, setRateCards] = useState<RateCardItem[]>([])
   const [formData, setFormData] = useState({
-    name: "", description: "", pocId: "", clientId: "", city: "", branch: "", deliveryDate: "", instructions: "", packingCharges: "", packingChargesGstRate: "18",
+    name: "", pocId: "", clientId: "", city: "", branch: "", deliveryDate: "", instructions: "", packingCharges: "", packingChargesGstRate: "18",
     recipientName: "", recipientContact: "", recipientBranch: "", sameAsPoc: false,
   })
   const [showPackingForm, setShowPackingForm] = useState(false)
 
+  const [cities, setCities] = useState<string[]>(CITIES)
+  const [branchLocations, setBranchLocations] = useState<Record<string, { state: string; branches: string[] }>>(BRANCH_LOCATIONS)
+
+  // Dynamically merge custom locations and branches from the POCs list
+  useEffect(() => {
+    if (pocs.length > 0) {
+      const mergedLocations = {} as Record<string, { state: string; branches: string[] }>
+      Object.keys(BRANCH_LOCATIONS).forEach((key) => {
+        mergedLocations[key] = {
+          state: BRANCH_LOCATIONS[key].state,
+          branches: [...BRANCH_LOCATIONS[key].branches]
+        }
+      })
+      pocs.forEach((p) => {
+        if (p.location) {
+          const city = p.location.trim()
+          if (city) {
+            const existingCity = Object.keys(mergedLocations).find(
+              (c) => c.toLowerCase() === city.toLowerCase()
+            )
+            const targetCity = existingCity || city
+            if (!mergedLocations[targetCity]) {
+              mergedLocations[targetCity] = { state: "", branches: [] }
+            }
+            if (p.branch) {
+              const branchName = p.branch.trim()
+              if (branchName) {
+                const existingBranch = mergedLocations[targetCity].branches.find(
+                  (b) => b.toLowerCase() === branchName.toLowerCase()
+                )
+                if (!existingBranch) {
+                  mergedLocations[targetCity].branches.push(branchName)
+                }
+              }
+            }
+          }
+        }
+      })
+      setBranchLocations(mergedLocations)
+      setCities(Object.keys(mergedLocations).sort())
+    }
+  }, [pocs])
+
   const [collaterals, setCollaterals] = useState<CollateralItem[]>([
-    { id: "1", itemName: "", quantity: 0, unitPrice: 0, totalPrice: 0, gstRate: 18 },
+    { id: "1", itemName: "", quantity: 0, unitPrice: 0, totalPrice: 0, gstRate: 18, specification: "" },
   ])
 
   // Auto-set POC if user is a POC
@@ -116,14 +160,13 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
     if (validCollaterals.length === 0) errs.collaterals = "Add at least one collateral with quantity"
     collaterals.forEach((c, i) => {
       if (c.itemName && c.quantity <= 0) errs[`qty_${i}`] = "Quantity must be greater than 0"
-      if (c.itemName && c.unitPrice <= 0) errs[`price_${i}`] = "Unit price must be greater than 0"
     })
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
 
   const addCollateral = () => {
-    setCollaterals([...collaterals, { id: Math.random().toString(36).substr(2, 9), itemName: "", quantity: 0, unitPrice: 0, totalPrice: 0, gstRate: 18 }])
+    setCollaterals([...collaterals, { id: Math.random().toString(36).substr(2, 9), itemName: "", quantity: 0, unitPrice: 0, totalPrice: 0, gstRate: 18, specification: "" }])
   }
 
   const removeCollateral = (id: string) => {
@@ -159,7 +202,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
     }))
   }
 
-  const cityData = formData.city ? BRANCH_LOCATIONS[formData.city] : null
+  const cityData = formData.city ? branchLocations[formData.city] : null
 
   // Calculate totals using individual GST rates per collateral item
   const subtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
@@ -191,7 +234,6 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
-          description: formData.description,
           pocId: formData.pocId || undefined,
           clientId: formData.clientId || undefined,
           location: formData.city,
@@ -204,7 +246,11 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
           recipientName: formData.recipientName || undefined,
           recipientContact: formData.recipientContact || undefined,
           recipientBranch: formData.recipientBranch || undefined,
-          collaterals: collaterals.filter((c) => c.itemName && c.quantity > 0),
+          collaterals: collaterals.filter((c) => c.itemName && c.quantity > 0).map(c => ({
+            itemName: c.itemName,
+            quantity: c.quantity,
+            specification: c.specification || "",
+          })),
           totalCost: totalCost,
         }),
       })
@@ -268,11 +314,32 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                       value={formData.pocId}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                         const selectedPoc = pocs.find(p => p.id === e.target.value)
+                        let matchedCity = formData.city
+                        let matchedBranch = formData.branch
+
+                        if (selectedPoc) {
+                          if (selectedPoc.location) {
+                            const cleanedLoc = selectedPoc.location.trim()
+                            const foundCity = Object.keys(branchLocations).find(
+                              c => c.toLowerCase() === cleanedLoc.toLowerCase()
+                            )
+                            matchedCity = foundCity || cleanedLoc
+                          }
+                          if (selectedPoc.branch) {
+                            const cleanedBranch = selectedPoc.branch.trim()
+                            const branches = branchLocations[matchedCity]?.branches || []
+                            const foundBranch = branches.find(
+                              b => b.toLowerCase() === cleanedBranch.toLowerCase()
+                            )
+                            matchedBranch = foundBranch || cleanedBranch
+                          }
+                        }
+
                         setFormData({
                           ...formData,
                           pocId: e.target.value,
-                          city: selectedPoc?.location || formData.city,
-                          branch: selectedPoc?.branch || formData.branch,
+                          city: matchedCity,
+                          branch: matchedBranch,
                         });
                         setErrors({ ...errors, pocId: "" })
                       }}
@@ -313,7 +380,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setFormData({ ...formData, city: e.target.value, branch: "" }); setErrors({ ...errors, city: "", branch: "" }) }}
                 >
                   <option value="">Select City</option>
-                  {CITIES.map((city) => (
+                  {cities.map((city) => (
                     <option key={city} value={city}>{city}</option>
                   ))}
                 </select>
@@ -361,17 +428,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Description</label>
-                <textarea
-                  className="form-input"
-                  value={formData.description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => { setFormData({ ...formData, description: e.target.value }) }}
-                  placeholder="Enter project description (optional)"
-                  rows={2}
-                  style={{ resize: 'vertical' }}
-                />
-              </div>
+
             </div>
           </div>
         </div>
@@ -394,53 +451,77 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '12px', fontSize: '12px', fontWeight: 800, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '0 8px 8px', borderBottom: '1px solid var(--gray-200)' }}>
               <div>Item</div>
               <div>Quantity</div>
-              <div>Unit Price</div>
+              <div>Rate / Unit</div>
               <div>Total</div>
               <div></div>
             </div>
 
             {/* Collateral Rows */}
             {collaterals.map((collateral, index) => (
-              <div key={collateral.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '12px', padding: '12px 8px', borderBottom: '1px solid var(--gray-100)', alignItems: 'center' }}>
-                <select
-                  className="form-select"
-                  value={collateral.itemName}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateCollateral(collateral.id, "itemName", e.target.value)}
-                  disabled={isFetching}
-                >
-                  <option value="">{isFetching ? "Loading..." : "Select Item"}</option>
-                  {rateCards.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  className={`form-input ${errors[`qty_${index}`] ? 'border-red-400' : ''}`}
-                  value={collateral.quantity || ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "quantity", parseInt(e.target.value) || 0)}
-                  placeholder="0"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  className={`form-input ${errors[`price_${index}`] ? 'border-red-400' : ''}`}
-                  value={collateral.unitPrice || ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                />
-                <div style={{ padding: '10px 12px', background: 'var(--gray-100)', borderRadius: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'right', color: 'var(--gray-800)' }}>
-                  {formatCurrency(collateral.totalPrice)}
-                </div>
-                {collaterals.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeCollateral(collateral.id)}
-                    style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gray-400)', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--gray-400)'; e.currentTarget.style.background = 'transparent' }}
+              <div key={collateral.id} style={{ padding: '12px 8px', borderBottom: '1px solid var(--gray-100)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '12px', alignItems: 'center' }}>
+                  <select
+                    className="form-select"
+                    value={collateral.itemName}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateCollateral(collateral.id, "itemName", e.target.value)}
+                    disabled={isFetching}
                   >
-                    <TrashIcon />
-                  </button>
-                )}
+                    <option value="">{isFetching ? "Loading..." : "Select Item"}</option>
+                    {rateCards.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    className={`form-input ${errors[`qty_${index}`] ? 'border-red-400' : ''}`}
+                    value={collateral.quantity || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "quantity", parseInt(e.target.value) || 0)}
+                    placeholder="0"
+                  />
+                  <div
+                    title="Auto-set from rate card"
+                    style={{
+                      padding: '10px 12px',
+                      background: 'var(--gray-50)',
+                      border: '1px solid var(--gray-200)',
+                      borderRadius: '10px',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: collateral.unitPrice > 0 ? 'var(--gray-700)' : 'var(--gray-400)',
+                      fontSize: '13px',
+                      textAlign: 'right',
+                      cursor: 'default',
+                      userSelect: 'none' as const,
+                    }}
+                  >
+                    {collateral.unitPrice > 0 ? `₹${collateral.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                  </div>
+                  <div style={{ padding: '10px 12px', background: 'var(--gray-100)', borderRadius: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'right', color: 'var(--gray-800)' }}>
+                    {formatCurrency(collateral.totalPrice)}
+                  </div>
+                  {collaterals.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeCollateral(collateral.id)}
+                      style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gray-400)', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--gray-400)'; e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <TrashIcon />
+                    </button>
+                  )}
+                </div>
+                {/* Item Specification/Description Input */}
+                <div style={{ marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={collateral.specification || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "specification", e.target.value)}
+                    placeholder="Enter item description/specification (optional)"
+                    style={{ fontSize: '13px', padding: '8px 12px', flex: 1 }}
+                  />
+                  <div style={{ width: '36px' }}></div>
+                </div>
               </div>
             ))}
 

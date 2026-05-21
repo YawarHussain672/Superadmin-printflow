@@ -73,7 +73,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
       const logoData = fs.readFileSync(pngPath)
       const base64Image = logoData.toString('base64')
-      doc.addImage(base64Image, 'PNG', 10, 4.5, 30, 15)
+      doc.addImage(base64Image, 'PNG', 10, 3.9, 30, 15)
     }
   } catch (error) {
     // If logo processing fails, use purple text fallback
@@ -161,7 +161,8 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === SECOND ROW BOXES ===
   const secondRowY = detailsY + boxHeight + 2
-  const secondRowHeight = 15
+  const hasRecipientDetails = Boolean(project.recipientBranch)
+  const secondRowHeight = hasRecipientDetails ? 24 : 15
 
   // Delivery Address
   doc.setFont("times", "bold")
@@ -169,14 +170,16 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFont("times", "normal")
   doc.setFontSize(9)
   if (project.recipientBranch) {
-    doc.text(project.recipientBranch, 12, secondRowY + 12)
-  } else if (project.deliveryAddress) {
-    doc.text(project.deliveryAddress, 12, secondRowY + 12)
+    const addressLines = doc.splitTextToSize(project.recipientBranch.trim(), colWidth - 4)
+    addressLines.forEach((line: string, index: number) => {
+      doc.text(line, 12, secondRowY + 12 + index * 4.5)
+    })
   }
   doc.rect(10, secondRowY, colWidth, secondRowHeight)
   doc.line(10, secondRowY + 8, 10 + colWidth, secondRowY + 8)
 
   // Terms of Delivery
+  doc.setFont("times", "bold")
   doc.text("Terms of Delivery", rightBoxX + 2, secondRowY + 6)
   doc.setFont("times", "normal")
   doc.text(`POC: ${project.pocName || "N/A"}`, rightBoxX + 2, secondRowY + 12)
@@ -199,9 +202,12 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   for (const item of project.collaterals) {
     const gstRate = item.gstRate || 18
+    const displayName = item.specification && item.specification.trim()
+      ? `${item.itemName} (${item.specification.trim()})`
+      : item.itemName
     tableData.push([
       sNo++,
-      item.itemName,
+      displayName,
       `${gstRate}%`,
       item.quantity,
       "Nos",

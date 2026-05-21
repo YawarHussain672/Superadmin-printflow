@@ -75,9 +75,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    // Generate new PI number
+    // Generate new PI number if not already present
     const previousPiPdfUrl = project.piPdfUrl
-    const piNumber = await generatePINumber()
+    const piNumber = project.piNumber || (await generatePINumber())
     const generatedAt = new Date()
 
     // Generate PDF

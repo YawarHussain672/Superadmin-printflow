@@ -4,11 +4,12 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ProjectStatus, Prisma } from "@prisma/client"
 import { pusherServer, CHANNELS, EVENTS } from "@/lib/pusher"
-import { createNotification } from "@/lib/notifications"
+import { createNotification, notifyAdminPIPending } from "@/lib/notifications"
 import { sendProductionStartedEmail, sendShipmentDispatchedEmail } from "@/lib/email"
 import { formatCurrency } from "@/utils/formatters"
 import { calculateTotal } from "@/lib/ratecard"
-import { deleteFromS3 } from "@/lib/s3"
+import { deleteFromS3, uploadToS3 } from "@/lib/s3"
+import { generatePIPDF } from "@/lib/pi-generator"
 
 function getS3KeyFromUrl(url: string | null | undefined): string | null {
   if (!url) return null
@@ -34,7 +35,7 @@ async function deleteS3Asset(url: string | null | undefined) {
   }
 }
 
-async function priceCollaterals(collaterals: Array<{ itemName: string; quantity: number }>) {
+async function priceCollaterals(collaterals: Array<{ itemName: string; quantity: number; specification?: string | null }>) {
   const priced = await Promise.all(collaterals.map(async (c) => {
     const calc = await calculateTotal(c.itemName, c.quantity)
     if (calc === null) {
@@ -48,6 +49,7 @@ async function priceCollaterals(collaterals: Array<{ itemName: string; quantity:
       totalPrice: calc.subtotal,
       gstRate: calc.gstRate,
       gstAmount: calc.gst,
+      specification: c.specification || null,
     }
   }))
 
@@ -118,12 +120,36 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
     const body = await request.json()
-    const { name, pocId, clientId, location, state, deliveryDate, instructions, collaterals, status, note, dispatch, packingCharges, packingChargesGstRate } = body
+    const { name, pocId, clientId, location, branch, state, deliveryDate, instructions, collaterals, status, note, dispatch, packingCharges, packingChargesGstRate, recipientName, recipientContact, recipientBranch } = body
 
     // clientId: "" means "remove client" - treat as null (client is optional)
 
     // Fetch existing project to check ownership and status
-    const existing = await prisma.project.findUnique({ where: { id }, select: { pocId: true, status: true, piStatus: true, approval: { select: { status: true } }, name: true, piNumber: true, projectId: true, location: true, packingCharges: true, packingChargesGstRate: true, poc: { select: { id: true, name: true, email: true } } } })
+    const existing = await prisma.project.findUnique({
+      where: { id },
+      select: {
+        pocId: true,
+        clientId: true,
+        status: true,
+        piStatus: true,
+        approval: { select: { status: true } },
+        name: true,
+        piNumber: true,
+        projectId: true,
+        location: true,
+        branch: true,
+        state: true,
+        deliveryDate: true,
+        instructions: true,
+        packingCharges: true,
+        packingChargesGstRate: true,
+        recipientName: true,
+        recipientContact: true,
+        recipientBranch: true,
+        poc: { select: { id: true, name: true, email: true } },
+        collaterals: true,
+      }
+    })
     if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 })
 
     const isAdmin = session.user.role === "ADMIN"
@@ -138,6 +164,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       pocId,
       clientId,
       location,
+      branch,
       state,
       deliveryDate,
       instructions,
@@ -145,6 +172,52 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       packingCharges,
       packingChargesGstRate,
     ].some((value) => value !== undefined)
+
+    // Check if any details affecting PI have changed (only if project already has a PI number)
+    let detailsChanged = false
+    if (existing.piNumber) {
+      const nameChanged = name !== undefined && name !== existing.name
+      const pocIdChanged = pocId !== undefined && pocId !== existing.pocId
+      const clientIdChanged = clientId !== undefined && clientId !== existing.clientId
+      const locationChanged = location !== undefined && location !== existing.location
+      const branchChanged = branch !== undefined && branch !== existing.branch
+      const stateChanged = state !== undefined && state !== existing.state
+      
+      const existingDateStr = existing.deliveryDate ? new Date(existing.deliveryDate).toISOString().split('T')[0] : ""
+      let newDateStr = ""
+      if (deliveryDate) {
+        try {
+          newDateStr = new Date(deliveryDate).toISOString().split('T')[0]
+        } catch {}
+      }
+      const deliveryDateChanged = deliveryDate !== undefined && newDateStr !== existingDateStr
+
+      const instructionsChanged = instructions !== undefined && instructions !== existing.instructions
+      const packingChargesChanged = packingCharges !== undefined && packingCharges !== existing.packingCharges
+      const packingChargesGstRateChanged = packingChargesGstRate !== undefined && packingChargesGstRate !== existing.packingChargesGstRate
+      const recipientNameChanged = recipientName !== undefined && recipientName !== existing.recipientName
+      const recipientContactChanged = recipientContact !== undefined && recipientContact !== existing.recipientContact
+      const recipientBranchChanged = recipientBranch !== undefined && recipientBranch !== existing.recipientBranch
+
+      let collateralsChanged = false
+      if (collaterals !== undefined) {
+        const origCols = existing.collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
+        const newCols = collaterals.map((c: any) => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
+        
+        const sortCollateral = (a: { itemName: string; quantity: number }, b: { itemName: string; quantity: number }) =>
+          a.itemName.localeCompare(b.itemName) || a.quantity - b.quantity
+
+        origCols.sort(sortCollateral)
+        newCols.sort(sortCollateral)
+
+        collateralsChanged = origCols.length !== newCols.length ||
+          origCols.some((item, idx) => item.itemName !== newCols[idx].itemName || item.quantity !== newCols[idx].quantity || item.specification !== newCols[idx].specification)
+      }
+
+      detailsChanged = nameChanged || pocIdChanged || clientIdChanged || locationChanged || branchChanged || stateChanged ||
+        deliveryDateChanged || instructionsChanged || packingChargesChanged || packingChargesGstRateChanged ||
+        recipientNameChanged || recipientContactChanged || recipientBranchChanged || collateralsChanged
+    }
 
     // CLIENT cannot edit projects
     if (isClient) {
@@ -190,11 +263,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
     if (location !== undefined) updateData.location = location
+    if (branch !== undefined) updateData.branch = branch
     if (state !== undefined) updateData.state = state
     if (deliveryDate !== undefined) updateData.deliveryDate = new Date(deliveryDate)
     if (instructions !== undefined) updateData.instructions = instructions
     if (packingCharges !== undefined) updateData.packingCharges = packingCharges
     if (packingChargesGstRate !== undefined) updateData.packingChargesGstRate = packingChargesGstRate
+    if (recipientName !== undefined) updateData.recipientName = recipientName === "" ? null : recipientName
+    if (recipientContact !== undefined) updateData.recipientContact = recipientContact === "" ? null : recipientContact
+    if (recipientBranch !== undefined) updateData.recipientBranch = recipientBranch === "" ? null : recipientBranch
     if (status !== undefined) {
       const newStatus = status as ProjectStatus
 
@@ -295,13 +372,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           totalPrice: c.totalPrice,
           gstRate: c.gstRate,
           gstAmount: c.gstAmount,
+          specification: c.specification,
         })),
       }
       // Calculate total cost including items GST and packing charges with their GST
       const itemsGst = priced.totalGst
       const packingSubtotal = packingCharges || 0
       const packingGst = packingSubtotal * ((packingChargesGstRate || 18) / 100)
-      
+
       updateData.totalCost = priced.subtotal + packingSubtotal
       updateData.grandTotal = priced.subtotal + itemsGst + packingSubtotal + packingGst
     } else if (packingCharges !== undefined || packingChargesGstRate !== undefined) {
@@ -312,7 +390,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const packingSubtotal = packingCharges !== undefined ? packingCharges : (existing.packingCharges || 0)
       const packingRate = packingChargesGstRate !== undefined ? packingChargesGstRate : (existing.packingChargesGstRate || 18)
       const packingGst = packingSubtotal * (packingRate / 100)
-      
+
       updateData.totalCost = subtotal + packingSubtotal
       updateData.grandTotal = subtotal + itemsGst + packingSubtotal + packingGst
     }
@@ -341,6 +419,83 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const project = await prisma.project.update({ where: { id }, data: updateData })
+
+    // Auto-regenerate PI if details changed and PI was already generated
+    if (existing.piNumber && detailsChanged) {
+      try {
+        const freshProject = await prisma.project.findUnique({
+          where: { id },
+          include: {
+            collaterals: true,
+            poc: {
+              select: { name: true, email: true, location: true },
+            },
+            client: {
+              select: { name: true, email: true, location: true, phone: true, clientPan: true, clientGst: true },
+            },
+          },
+        })
+
+        if (freshProject) {
+          const generatedAt = new Date()
+          const pdfBuffer = await generatePIPDF({
+            projectId: freshProject.projectId,
+            name: freshProject.name,
+            piNumber: freshProject.piNumber!,
+            location: freshProject.location,
+            state: freshProject.state,
+            totalCost: freshProject.totalCost,
+            packingCharges: freshProject.packingCharges,
+            packingChargesGstRate: freshProject.packingChargesGstRate,
+            pocName: freshProject.poc?.name,
+            pocEmail: freshProject.poc?.email,
+            clientName: freshProject.client?.name,
+            clientEmail: freshProject.client?.email,
+            clientLocation: freshProject.client?.location,
+            clientPan: freshProject.client?.clientPan,
+            clientGst: freshProject.client?.clientGst,
+            deliveryAddress: `${freshProject.location}${freshProject.state ? `, ${freshProject.state}` : ""}`,
+            recipientName: freshProject.recipientName,
+            recipientContact: freshProject.recipientContact,
+            recipientBranch: freshProject.recipientBranch,
+            collaterals: freshProject.collaterals,
+            generatedAt: generatedAt,
+          })
+
+          const s3Path = `projects/${id}/pi/${freshProject.piNumber}.pdf`
+          const s3Url = await uploadToS3(pdfBuffer, s3Path, "application/pdf")
+
+          // Update project with PI details and reset verification status
+          const finalProject = await prisma.project.update({
+            where: { id },
+            data: {
+              piStatus: "PENDING",
+              piPdfUrl: s3Url,
+              piGeneratedAt: generatedAt,
+            },
+          })
+
+          // Cleanup previous PI if it exists and is different
+          if (freshProject.piPdfUrl && freshProject.piPdfUrl !== s3Url) {
+            await deleteS3Asset(freshProject.piPdfUrl)
+          }
+
+          await notifyAdminPIPending(
+            freshProject.id,
+            freshProject.name,
+            freshProject.piNumber!,
+            freshProject.poc?.name || "Unknown"
+          )
+
+          await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { id })
+          await pusherServer.trigger(CHANNELS.DASHBOARD, EVENTS.STATS_UPDATED, {})
+          return NextResponse.json(finalProject)
+        }
+      } catch (piError) {
+        console.error("Auto PI regeneration failed:", piError)
+      }
+    }
+
     await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { id })
     await pusherServer.trigger(CHANNELS.DASHBOARD, EVENTS.STATS_UPDATED, {})
     return NextResponse.json(project)

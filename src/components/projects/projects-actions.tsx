@@ -27,6 +27,7 @@ interface Project {
     courier: string
     trackingId: string
   } | null
+  piNumber?: string | null
 }
 
 interface ProjectsActionsProps {
@@ -117,7 +118,12 @@ export function ProjectsActions({ projectId, project: initialProject, isAdmin = 
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           isAdmin={isAdmin}
-          onSuccess={() => router.refresh()}
+          onSuccess={async (shouldRegeneratePI) => {
+            router.refresh()
+            if (shouldRegeneratePI && project?.id) {
+              toast.success("PI regenerated automatically after project update.")
+            }
+          }}
         />
       )}
     </>

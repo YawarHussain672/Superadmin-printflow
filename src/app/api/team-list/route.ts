@@ -14,7 +14,7 @@ export async function GET() {
         role: { in: ["POC", "CLIENT"] },
         ...(session.user.role === "POC" ? { id: session.user.id } : {}),
       },
-      select: { id: true, name: true, role: true },
+      select: { id: true, name: true, role: true, email: true, phone: true, location: true, branch: true },
       orderBy: { name: "asc" },
     })
     return NextResponse.json(users)

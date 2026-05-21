@@ -12,31 +12,41 @@ export async function getUnitPrice(itemName: string, quantity: number): Promise<
   const slabs = parseVolumeSlabs(rateCard.volumeSlabs).sort((a, b) => a.minQty - b.minQty)
   if (slabs.length === 0) return null
 
-  // Find the applicable slab for this quantity
-  const matchingSlab = slabs.find(
-    (slab) => quantity >= slab.minQty && (slab.maxQty === null || quantity <= slab.maxQty)
-  )
-
-  // Calculate effective unit price (base price + any tier discount/offset)
-  // First slab is always the base price
   const basePrice = slabs[0].price
 
-  if (matchingSlab) {
-    // For subsequent slabs, the price represents the effective unit price
-    // or a discount if negative
-    if (slabs.indexOf(matchingSlab) === 0) {
-      return basePrice
-    } else {
-      // For higher tiers, price can be negative (discount) or a new price
-      // If negative, it's a per-unit discount from base price
-      // If positive, it's the new unit price
-      return matchingSlab.price < 0 ? basePrice + matchingSlab.price : matchingSlab.price
+  // Check if any slab has a negative price (discount-style pricing)
+  const hasNegativePrices = slabs.some(s => s.price < 0)
+
+  if (hasNegativePrices) {
+    // Discount-style: find highest matching slab, apply discount from base
+    let matchedSlabIndex = -1
+    for (let i = 0; i < slabs.length; i++) {
+      const slab = slabs[i]
+      const inRange = slab.maxQty !== null
+        ? quantity >= slab.minQty && quantity <= slab.maxQty
+        : quantity >= slab.minQty
+      if (inRange) matchedSlabIndex = i // keep iterating to find highest
     }
+    if (matchedSlabIndex === -1) return null
+    const discount = matchedSlabIndex > 0 ? slabs[matchedSlabIndex].price : 0
+    return Math.max(0, basePrice + discount)
   }
 
-  // If quantity exceeds all defined ranges, use the highest tier
-  const highestSlab = slabs[slabs.length - 1]
-  return highestSlab.price < 0 ? basePrice + highestSlab.price : highestSlab.price
+  // Standard pricing (all positive prices)
+  // First try exact range match (slab has both minQty and maxQty)
+  const exactRangeMatch = slabs.find(
+    (slab) => slab.maxQty !== null && quantity >= slab.minQty && quantity <= slab.maxQty
+  )
+  if (exactRangeMatch) return exactRangeMatch.price
+
+  // For threshold-style slabs (maxQty === null), find the highest minQty that still matches
+  // Sort descending by minQty to find the best (most discounted / highest tier) match
+  const sortedByMinDesc = [...slabs].sort((a, b) => b.minQty - a.minQty)
+  const thresholdMatch = sortedByMinDesc.find((slab) => quantity >= slab.minQty)
+  if (thresholdMatch) return thresholdMatch.price
+
+  // Fallback to first slab
+  return basePrice
 }
 
 export async function calculateTotal(itemName: string, quantity: number): Promise<{ unitPrice: number; subtotal: number; gst: number; total: number; gstRate: number } | null> {

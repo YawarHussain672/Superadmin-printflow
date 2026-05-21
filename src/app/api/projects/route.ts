@@ -34,10 +34,11 @@ const createProjectSchema = z.object({
     quantity: z.number().int().min(1, "Quantity must be at least 1"),
     unitPrice: z.number().min(0).optional(),
     totalPrice: z.number().min(0).optional(),
+    specification: z.string().max(1000).optional().nullable(),
   })).min(1, "At least one collateral is required"),
 })
 
-async function priceCollaterals(collaterals: Array<{ itemName: string; quantity: number }>) {
+async function priceCollaterals(collaterals: Array<{ itemName: string; quantity: number; specification?: string | null }>) {
   const priced = await Promise.all(collaterals.map(async (c) => {
     const calc = await calculateTotal(c.itemName, c.quantity)
     if (calc === null) {
@@ -51,6 +52,7 @@ async function priceCollaterals(collaterals: Array<{ itemName: string; quantity:
       totalPrice: calc.subtotal,
       gstRate: calc.gstRate,
       gstAmount: calc.gst,
+      specification: c.specification || null,
     }
   }))
 
@@ -263,6 +265,7 @@ export async function POST(request: NextRequest) {
             totalPrice: c.totalPrice,
             gstRate: c.gstRate,
             gstAmount: c.gstAmount,
+            specification: c.specification,
           })),
         },
         statusHistory: {

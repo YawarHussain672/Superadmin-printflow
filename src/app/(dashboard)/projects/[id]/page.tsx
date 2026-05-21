@@ -144,26 +144,9 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   }
 
   const handleProjectUpdated = async (shouldRegeneratePI = false) => {
+    await refreshProject()
     if (shouldRegeneratePI && project?.piNumber) {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/projects/${id}/generate-pi`, { method: "POST" })
-        const data = await res.json()
-        if (res.ok) {
-          toast.success("PI regenerated automatically after project update.")
-          await fetchProject()
-        } else {
-          toast.error(data.error || "Failed to regenerate PI after project update.")
-          await fetchProject()
-        }
-      } catch (error) {
-        toast.error("Failed to regenerate PI after project update.")
-        await fetchProject()
-      } finally {
-        setLoading(false)
-      }
-    } else {
-      await refreshProject()
+      toast.success("PI regenerated automatically after project update.")
     }
   }
 

@@ -7,6 +7,8 @@ import { useSession } from "next-auth/react"
 import { openNewProjectModal } from "@/components/projects/new-project-modal"
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { toast } from "sonner"
+import { CITIES } from "@/lib/branch-locations"
 
 const PAGE_SIZE = 20
 
@@ -31,7 +33,11 @@ interface Project {
   packingChargesGstRate?: number | null
   poc?: { id: string; name: string; role?: string }
   client?: { id: string; name: string; role?: string }
-  collaterals?: { itemName: string; quantity: number }[]
+  collaterals?: { id?: string; itemName: string; quantity: number; unitPrice?: number; totalPrice?: number; gstRate?: number | null; gstAmount?: number | null }[]
+  recipientName?: string | null
+  recipientContact?: string | null
+  recipientBranch?: string | null
+  piNumber?: string | null
 }
 
 // SVG Icons
@@ -87,6 +93,8 @@ export function ProjectsPageClient() {
   const [locations, setLocations] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+
+  const mergedLocations = Array.from(new Set([...CITIES, ...locations])).sort()
 
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -223,42 +231,9 @@ export function ProjectsPageClient() {
             onChange={(e) => router.push(buildUrl({ location: e.target.value }))}
           >
             <option value="">All Cities</option>
-            <option value="Ahmedabad">Ahmedabad</option>
-            <option value="Bangalore">Bangalore</option>
-            <option value="Bhopal">Bhopal</option>
-            <option value="Bhubaneswar">Bhubaneswar</option>
-            <option value="Chandigarh">Chandigarh</option>
-            <option value="Chennai">Chennai</option>
-            <option value="Coimbatore">Coimbatore</option>
-            <option value="Delhi">Delhi</option>
-            <option value="Faridabad">Faridabad</option>
-            <option value="Ghaziabad">Ghaziabad</option>
-            <option value="Gurugram">Gurugram</option>
-            <option value="Hyderabad">Hyderabad</option>
-            <option value="Indore">Indore</option>
-            <option value="Jaipur">Jaipur</option>
-            <option value="Kanpur">Kanpur</option>
-            <option value="Kochi">Kochi</option>
-            <option value="Kolkata">Kolkata</option>
-            <option value="Lucknow">Lucknow</option>
-            <option value="Ludhiana">Ludhiana</option>
-            <option value="Madurai">Madurai</option>
-            <option value="Mumbai">Mumbai</option>
-            <option value="Mysore">Mysore</option>
-            <option value="Nagpur">Nagpur</option>
-            <option value="Nashik">Nashik</option>
-            <option value="Noida">Noida</option>
-            <option value="Patna">Patna</option>
-            <option value="Pune">Pune</option>
-            <option value="Raipur">Raipur</option>
-            <option value="Ranchi">Ranchi</option>
-            <option value="Surat">Surat</option>
-            <option value="Thane">Thane</option>
-            <option value="Thiruvananthapuram">Thiruvananthapuram</option>
-            <option value="Vadodara">Vadodara</option>
-            <option value="Varanasi">Varanasi</option>
-            <option value="Vijayawada">Vijayawada</option>
-            <option value="Visakhapatnam">Visakhapatnam</option>
+            {mergedLocations.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
           </select>
           {!isClient && (
             <button className="btn btn-primary" onClick={openNewProjectModal} style={{ marginLeft: 'auto' }}>
@@ -373,12 +348,24 @@ export function ProjectsPageClient() {
                       <td><StatusBadge status={project.status} /></td>
                       <td>{new Date(project.deliveryDate).toLocaleDateString('en-IN')}</td>
                       <td className="font-mono">
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontWeight: 600 }}>₹{(project.grandTotal || project.totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
-                            (Base: ₹{(project.totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + GST: ₹{((project.grandTotal || project.totalCost) - project.totalCost).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                          </span>
-                        </div>
+                        {(() => {
+                          // Compute grand total from collateral gstAmounts when grandTotal is 0 (legacy projects)
+                          const collateralGst = project.collaterals?.reduce((s, c) => s + (c.gstAmount ?? (c.totalPrice || 0) * ((c.gstRate ?? 18) / 100)), 0) ?? 0
+                          const packingGst = (project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100)
+                          const computedGrandTotal = project.totalCost + collateralGst + packingGst
+                          const displayGrandTotal = project.grandTotal && project.grandTotal > project.totalCost
+                            ? project.grandTotal
+                            : computedGrandTotal
+                          const gstPart = displayGrandTotal - project.totalCost
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontWeight: 600 }}>₹{displayGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
+                                (Base: ₹{project.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + GST: ₹{gstPart.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                              </span>
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
@@ -488,19 +475,29 @@ export function ProjectsPageClient() {
             packingCharges: editingProject.packingCharges,
             packingChargesGstRate: editingProject.packingChargesGstRate,
             collaterals: editingProject.collaterals?.map((c, i) => ({
-              id: String(i),
+              id: c.id || String(i),
               itemName: c.itemName,
               quantity: c.quantity,
-              unitPrice: 0,
-              totalPrice: 0,
+              unitPrice: c.unitPrice || 0,
+              totalPrice: c.totalPrice || 0,
+              gstRate: c.gstRate ?? 18,
+              gstAmount: c.gstAmount ?? 0,
             })),
+            recipientName: editingProject.recipientName,
+            recipientContact: editingProject.recipientContact,
+            recipientBranch: editingProject.recipientBranch,
+            piNumber: editingProject.piNumber,
           }}
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           isAdmin={isAdmin}
-          onSuccess={() => {
+          onSuccess={async (shouldRegeneratePI) => {
             fetchData()
+            const projId = editingProject?.id
             setEditingProject(null)
+            if (shouldRegeneratePI && projId) {
+              toast.success("PI regenerated automatically after project update.")
+            }
           }}
         />
       )}

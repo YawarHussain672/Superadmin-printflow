@@ -13,6 +13,7 @@ interface Project {
   pocId: string
   clientId: string
   location: string
+  branch?: string | null
   state: string
   deliveryDate: string | null
   status: string
@@ -21,14 +22,25 @@ interface Project {
   quantity?: number
   packingCharges?: number | null
   packingChargesGstRate?: number | null
-  collaterals?: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null }[]
+  collaterals?: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
   dispatch?: {
     courier: string
     trackingId: string
   } | null
+  recipientName?: string | null
+  recipientContact?: string | null
+  recipientBranch?: string | null
 }
 
-interface POC { id: string; name: string; role?: string }
+interface POC {
+  id: string
+  name: string
+  role?: string
+  email?: string | null
+  phone?: string | null
+  location?: string | null
+  branch?: string | null
+}
 
 interface RateCardItem {
   id: string
@@ -46,6 +58,7 @@ interface CollateralWithPrice {
   totalPrice: number
   gstRate?: number
   gstAmount?: number
+  specification?: string | null
 }
 
 interface EditProjectDialogProps {
@@ -82,6 +95,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   const [isFetching, setIsFetching] = useState(false)
   const [pocs, setPocs] = useState<POC[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null)
+  const [sameAsPoc, setSameAsPoc] = useState(false)
+
+  const [cities, setCities] = useState<string[]>(CITIES)
+  const [branchLocations, setBranchLocations] = useState<Record<string, { state: string; branches: string[] }>>(BRANCH_LOCATIONS)
 
   // Match HTML reference form fields exactly
   const [formData, setFormData] = useState({
@@ -89,11 +107,15 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     pocId: "",
     clientId: "",
     location: "",
+    branch: "",
     status: "",
     material: "",
     quantity: "",
     courier: "",
     deliveryDate: "",
+    recipientName: "",
+    recipientContact: "",
+    recipientBranch: "",
   })
 
   // State for collaterals (items) with prices
@@ -102,6 +124,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   const [showAddItemForm, setShowAddItemForm] = useState(false)
   const [selectedRateCardItem, setSelectedRateCardItem] = useState("")
   const [newItemQuantity, setNewItemQuantity] = useState("")
+  const [newItemSpecification, setNewItemSpecification] = useState("")
   const [totalCost, setTotalCost] = useState(0)
   const [packingCharges, setPackingCharges] = useState(0)
   const [packingChargesGstRate, setPackingChargesGstRate] = useState(18)
@@ -111,7 +134,12 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
 
   // Load form data when dialog opens
   useEffect(() => {
-    if (!open || !project) return
+    if (!open) {
+      setLoadedProjectId(null)
+      return
+    }
+    if (!project) return
+    if (project.id === loadedProjectId) return
 
     async function loadData() {
       if (!project) return
@@ -124,9 +152,19 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
         ])
 
         let fetchedRateCards: RateCardItem[] = []
+        let teamData: POC[] = []
         if (teamRes.ok) {
           const team = await teamRes.json()
-          setPocs(team.map((u: { id: string; name: string; role?: string }) => ({ id: u.id, name: u.name, role: u.role })))
+          teamData = team.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            email: u.email,
+            phone: u.phone,
+            location: u.location,
+            branch: u.branch,
+          }))
+          setPocs(teamData)
         } else {
           const errorData = await teamRes.json().catch(() => ({ error: "Unknown error" }))
           console.error("Team API error:", errorData)
@@ -138,18 +176,75 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           setRateCardItems(fetchedRateCards)
         }
 
+        // Merge custom locations/branches from teamData and from the current project itself
+        const mergedLocations = {} as Record<string, { state: string; branches: string[] }>
+        Object.keys(BRANCH_LOCATIONS).forEach((key) => {
+          mergedLocations[key] = {
+            state: BRANCH_LOCATIONS[key].state,
+            branches: [...BRANCH_LOCATIONS[key].branches]
+          }
+        })
+
+        const mergeItem = (locStr?: string | null, branchStr?: string | null) => {
+          if (locStr) {
+            const city = locStr.trim()
+            if (city) {
+              const existingCity = Object.keys(mergedLocations).find(
+                (c) => c.toLowerCase() === city.toLowerCase()
+              )
+              const targetCity = existingCity || city
+              if (!mergedLocations[targetCity]) {
+                mergedLocations[targetCity] = { state: "", branches: [] }
+              }
+              if (branchStr) {
+                const branchName = branchStr.trim()
+                if (branchName) {
+                  const existingBranch = mergedLocations[targetCity].branches.find(
+                    (b) => b.toLowerCase() === branchName.toLowerCase()
+                  )
+                  if (!existingBranch) {
+                    mergedLocations[targetCity].branches.push(branchName)
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (project) {
+          mergeItem(project.location, project.branch)
+        }
+        teamData.forEach((p) => mergeItem(p.location, p.branch))
+
+        setBranchLocations(mergedLocations)
+        setCities(Object.keys(mergedLocations).sort())
+
         // Set form data from project - match HTML reference exactly
         setFormData({
           name: project.name || "",
           pocId: project.pocId || "",
           clientId: project.clientId || "",
           location: project.location || "",
+          branch: project.branch || "",
           status: project.status?.toLowerCase() || "requested",
           material: project.material || project.collaterals?.[0]?.itemName || "",
           quantity: project.quantity?.toString() || project.collaterals?.[0]?.quantity?.toString() || "",
           courier: project.dispatch?.courier || "-",
           deliveryDate: project.deliveryDate ? project.deliveryDate.split("T")[0] : "",
+          recipientName: project.recipientName || "",
+          recipientContact: project.recipientContact || "",
+          recipientBranch: project.recipientBranch || "",
         })
+
+        const selectedPoc = teamData.find(p => p.id === project.pocId)
+        const isSame = Boolean(
+          project.recipientName &&
+          selectedPoc &&
+          project.recipientName === selectedPoc.name &&
+          (project.recipientContact === selectedPoc.email || project.recipientContact === selectedPoc.phone) &&
+          (project.recipientBranch === selectedPoc.branch || project.recipientBranch === selectedPoc.location)
+        )
+        setSameAsPoc(isSame)
 
         // Load all collaterals using saved prices (source of truth)
         // Only recalculate from rate card when quantity changes
@@ -167,6 +262,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
               totalPrice,
               gstRate,
               gstAmount: c.gstAmount ?? totalPrice * (gstRate / 100),
+              specification: c.specification || "",
             }
           }) || []
         setCollaterals(loadedCollaterals)
@@ -178,6 +274,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
         setPackingChargesGstRate(loadedPackingGstRate)
 
         updateTotalCost(loadedCollaterals, loadedPackingCharges)
+        setLoadedProjectId(project.id)
       } catch {
         toast.error("Failed to load form data")
       } finally {
@@ -186,7 +283,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     }
 
     loadData()
-  }, [open, project])
+  }, [open, project, loadedProjectId])
 
   // Parse slab string like "1-99", "100+", "1000", "Upto 100", "Less than 50"
   function parseSlabRange(slabLabel: string): { minQty: number; maxQty: number | null } {
@@ -298,40 +395,41 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
 
   // Update collateral quantity and recalculate price
   function updateCollateralQuantity(index: number, newQuantity: number) {
-      const updated = [...collaterals]
-      const item = updated[index]
-      item.quantity = newQuantity
-      const newUnitPrice = getUnitPriceFromRateCard(item.itemName, newQuantity)
-      // Only update price if rate card lookup succeeds, otherwise keep original
-      if (newUnitPrice > 0) {
-        item.unitPrice = newUnitPrice
-      }
-      item.totalPrice = item.unitPrice * newQuantity
-      if (item.gstRate !== undefined) {
-        item.gstAmount = item.totalPrice * (item.gstRate / 100)
-      }
-      setCollaterals(updated)
-      updateTotalCost(updated)
+    const updated = [...collaterals]
+    const item = updated[index]
+    item.quantity = newQuantity
+    const newUnitPrice = getUnitPriceFromRateCard(item.itemName, newQuantity)
+    // Only update price if rate card lookup succeeds, otherwise keep original
+    if (newUnitPrice > 0) {
+      item.unitPrice = newUnitPrice
     }
+    item.totalPrice = item.unitPrice * newQuantity
+    if (item.gstRate !== undefined) {
+      item.gstAmount = item.totalPrice * (item.gstRate / 100)
+    }
+    setCollaterals(updated)
+    updateTotalCost(updated)
+  }
   // Add new collateral from rate card
   function addCollateral() {
-      if (!selectedRateCardItem || !parseInt(newItemQuantity)) return
+    if (!selectedRateCardItem || !parseInt(newItemQuantity)) return
 
-      const quantity = parseInt(newItemQuantity)
-      const rateCard = rateCardItems.find(r => r.id === selectedRateCardItem)
-      if (!rateCard) return
+    const quantity = parseInt(newItemQuantity)
+    const rateCard = rateCardItems.find(r => r.id === selectedRateCardItem)
+    if (!rateCard) return
 
-      const unitPrice = getUnitPriceFromRateCard(rateCard.name, quantity)
-      const gstRate = rateCard.gstRate ?? 18
-      const totalPrice = unitPrice * quantity
-      const newCollateral: CollateralWithPrice = {
-        itemName: rateCard.name,
-        quantity: quantity,
-        unitPrice: unitPrice,
-        totalPrice,
-        gstRate,
-        gstAmount: totalPrice * (gstRate / 100),
-      }
+    const unitPrice = getUnitPriceFromRateCard(rateCard.name, quantity)
+    const gstRate = rateCard.gstRate ?? 18
+    const totalPrice = unitPrice * quantity
+    const newCollateral: CollateralWithPrice = {
+      itemName: rateCard.name,
+      quantity: quantity,
+      unitPrice: unitPrice,
+      totalPrice,
+      gstRate,
+      gstAmount: totalPrice * (gstRate / 100),
+      specification: newItemSpecification.trim() || "",
+    }
     const updated = [...collaterals, newCollateral]
     setCollaterals(updated)
     updateTotalCost(updated)
@@ -339,6 +437,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     // Reset form
     setSelectedRateCardItem("")
     setNewItemQuantity("")
+    setNewItemSpecification("")
     setShowAddItemForm(false)
   }
 
@@ -349,26 +448,27 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     updateTotalCost(updated)
   }
 
-const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
-    const itemGstAmount = collaterals.reduce(
-      (sum, c) => sum + (c.gstAmount ?? (c.totalPrice * ((c.gstRate ?? 18) / 100))),
-      0
-    )
-    const packingGstAmount = packingCharges * (packingChargesGstRate / 100)
-    const totalGstAmount = itemGstAmount + packingGstAmount
-    const grandTotalAmount = totalCost + totalGstAmount
-    const uniqueItemGstRates = [...new Set(collaterals.filter(c => c.itemName).map(c => `${c.gstRate ?? 18}%`))]
+  const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
+  const itemGstAmount = collaterals.reduce(
+    (sum, c) => sum + (c.gstAmount ?? (c.totalPrice * ((c.gstRate ?? 18) / 100))),
+    0
+  )
+  const packingGstAmount = packingCharges * (packingChargesGstRate / 100)
+  const totalGstAmount = itemGstAmount + packingGstAmount
+  const grandTotalAmount = totalCost + totalGstAmount
+  const uniqueItemGstRates = [...new Set(collaterals.filter(c => c.itemName).map(c => `${c.gstRate ?? 18}%`))]
 
-    const validate = () => {
-      const errs: Record<string, string> = {}
-      if (!formData.name.trim() || formData.name.trim().length < 3) errs.name = "Project name must be at least 3 characters"
-      if (!formData.pocId) errs.pocId = "Please select a POC"
-      if (!formData.location) errs.location = "Please select a location"
-      if (!formData.status) errs.status = "Please select a status"
-      if (!formData.deliveryDate) errs.deliveryDate = "Delivery date is required"
-      setErrors(errs)
-      return Object.keys(errs).length === 0
-    }
+  const validate = () => {
+    const errs: Record<string, string> = {}
+    if (!formData.name.trim() || formData.name.trim().length < 3) errs.name = "Project name must be at least 3 characters"
+    if (!formData.pocId) errs.pocId = "Please select a POC"
+    if (!formData.location) errs.location = "Please select a location"
+    if (!formData.branch) errs.branch = "Please select a branch location"
+    if (!formData.status) errs.status = "Please select a status"
+    if (!formData.deliveryDate) errs.deliveryDate = "Delivery date is required"
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -385,14 +485,19 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
           pocId: formData.pocId,
           clientId: formData.clientId,
           location: formData.location,
+          branch: formData.branch,
           deliveryDate: formData.deliveryDate,
           // Status is visible to all (matching HTML reference)
           status: formData.status.toUpperCase(),
+          recipientName: formData.recipientName || null,
+          recipientContact: formData.recipientContact || null,
+          recipientBranch: formData.recipientBranch || null,
           // Send all collaterals
           collaterals: collaterals.map(c => ({
             id: c.id,
             itemName: c.itemName,
             quantity: c.quantity,
+            specification: c.specification || "",
           })),
           // Packing charges
           packingCharges,
@@ -410,8 +515,8 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
       if (res.ok) {
         const originalCollaterals = project.collaterals
           ?.filter(c => c.itemName !== 'Packaging Charges' && c.itemName !== 'Packing Charges')
-          .map(c => ({ itemName: c.itemName, quantity: c.quantity })) || []
-        const updatedCollaterals = collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity }))
+          .map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" })) || []
+        const updatedCollaterals = collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
 
         const sortCollateral = (a: { itemName: string; quantity: number }, b: { itemName: string; quantity: number }) =>
           a.itemName.localeCompare(b.itemName) || a.quantity - b.quantity
@@ -422,13 +527,38 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
         const collateralsChanged = originalCollaterals.length !== updatedCollaterals.length ||
           originalCollaterals.some((item, index) =>
             item.itemName !== updatedCollaterals[index]?.itemName ||
-            item.quantity !== updatedCollaterals[index]?.quantity
+            item.quantity !== updatedCollaterals[index]?.quantity ||
+            item.specification !== updatedCollaterals[index]?.specification
           )
 
         const packingChanged = packingCharges !== (project.packingCharges || 0) ||
           packingChargesGstRate !== (project.packingChargesGstRate ?? 18)
 
-        const shouldRegeneratePI = Boolean(project.piNumber && (collateralsChanged || packingChanged))
+        const recipientNameChanged = (formData.recipientName || "") !== (project.recipientName || "")
+        const recipientContactChanged = (formData.recipientContact || "") !== (project.recipientContact || "")
+        const recipientBranchChanged = (formData.recipientBranch || "") !== (project.recipientBranch || "")
+        const recipientChanged = recipientNameChanged || recipientContactChanged || recipientBranchChanged
+
+        const nameChanged = formData.name.trim() !== (project.name || "").trim()
+        const pocIdChanged = formData.pocId !== (project.pocId || "")
+        const clientIdChanged = formData.clientId !== (project.clientId || "")
+        const locationChanged = formData.location !== (project.location || "")
+        const branchChanged = formData.branch !== (project.branch || "")
+        const statusChanged = formData.status.toUpperCase() !== (project.status || "").toUpperCase()
+        const deliveryDateChanged = (formData.deliveryDate || "") !== (project.deliveryDate ? project.deliveryDate.split("T")[0] : "")
+
+        const anyFormChanged = nameChanged ||
+          pocIdChanged ||
+          clientIdChanged ||
+          locationChanged ||
+          branchChanged ||
+          statusChanged ||
+          deliveryDateChanged ||
+          collateralsChanged ||
+          packingChanged ||
+          recipientChanged
+
+        const shouldRegeneratePI = Boolean(project.piNumber && anyFormChanged)
 
         toast.success("Project updated successfully!")
         onOpenChange(false)
@@ -473,7 +603,7 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
         </div>
 
         {/* Modal Body */}
-        <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
           {isFetching ? (
             <div style={{ textAlign: 'center', padding: '48px' }}>
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3" style={{ color: '#003c71' }} />
@@ -502,12 +632,51 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
                   <select
                     className="form-select"
                     value={formData.pocId}
-                    onChange={(e) => { setFormData({ ...formData, pocId: e.target.value }); setErrors({ ...errors, pocId: "" }) }}
+                    onChange={(e) => {
+                      const newPocId = e.target.value
+                      const selectedPoc = pocs.find(p => p.id === newPocId)
+                      setFormData(prev => {
+                        let matchedCity = prev.location
+                        let matchedBranch = prev.branch
+
+                        if (selectedPoc) {
+                          if (selectedPoc.location) {
+                            const cleanedLoc = selectedPoc.location.trim()
+                            const foundCity = Object.keys(branchLocations).find(
+                              c => c.toLowerCase() === cleanedLoc.toLowerCase()
+                            )
+                            matchedCity = foundCity || cleanedLoc
+                          }
+                          if (selectedPoc.branch) {
+                            const cleanedBranch = selectedPoc.branch.trim()
+                            const branches = branchLocations[matchedCity]?.branches || []
+                            const foundBranch = branches.find(
+                              b => b.toLowerCase() === cleanedBranch.toLowerCase()
+                            )
+                            matchedBranch = foundBranch || cleanedBranch
+                          }
+                        }
+
+                        const updated = {
+                          ...prev,
+                          pocId: newPocId,
+                          location: matchedCity,
+                          branch: matchedBranch,
+                        }
+                        if (sameAsPoc && selectedPoc) {
+                          updated.recipientName = selectedPoc.name
+                          updated.recipientContact = selectedPoc.email || selectedPoc.phone || ""
+                          updated.recipientBranch = matchedBranch || matchedCity || ""
+                        }
+                        return updated
+                      })
+                      setErrors(prev => ({ ...prev, pocId: "", location: "", branch: "" }))
+                    }}
                     style={errors.pocId ? { borderColor: '#ef4444' } : {}}
                   >
                     <option value="">Select POC</option>
                     {pocs.filter(p => p.role === 'POC').map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                      <option key={p.id} value={p.id}>{p.name}{p.branch ? ` (${p.branch})` : ''}</option>
                     ))}
                   </select>
                   {errors.pocId && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.pocId}</p>}
@@ -534,15 +703,36 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
                   <select
                     className="form-select"
                     value={formData.location}
-                    onChange={(e) => { setFormData({ ...formData, location: e.target.value }); setErrors({ ...errors, location: "" }) }}
+                    onChange={(e) => {
+                      setFormData({ ...formData, location: e.target.value, branch: "" });
+                      setErrors({ ...errors, location: "", branch: "" })
+                    }}
                     style={errors.location ? { borderColor: '#ef4444' } : {}}
                   >
                     <option value="">Select Location</option>
-                    {CITIES.map((loc) => (
+                    {cities.map((loc) => (
                       <option key={loc} value={loc}>{loc}</option>
                     ))}
                   </select>
                   {errors.location && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.location}</p>}
+                </div>
+
+                {/* Branch Location */}
+                <div className="form-group">
+                  <label className="form-label">Branch Location *</label>
+                  <select
+                    className="form-select"
+                    value={formData.branch}
+                    onChange={(e) => { setFormData({ ...formData, branch: e.target.value }); setErrors({ ...errors, branch: "" }) }}
+                    disabled={!formData.location}
+                    style={errors.branch ? { borderColor: '#ef4444' } : {}}
+                  >
+                    <option value="">{formData.location ? "Select Branch" : "Select location first"}</option>
+                    {formData.location && branchLocations[formData.location]?.branches.map((branch: string) => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                  {errors.branch && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.branch}</p>}
                 </div>
 
                 {/* Status - Visible to ALL like HTML reference */}
@@ -559,6 +749,81 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
                     ))}
                   </select>
                   {errors.status && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.status}</p>}
+                </div>
+
+                {/* Recipient Details - Full width, visible before items */}
+                <div className="form-group" style={{ gridColumn: '1 / -1', background: 'rgba(0, 60, 113, 0.03)', border: '1px solid rgba(0, 60, 113, 0.1)', borderRadius: '8px', padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-700)', margin: 0 }}>Recipient Details <span style={{ fontWeight: 400, fontSize: '12px', color: 'var(--gray-500)' }}>(Optional — used for PI delivery address)</span></label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--gray-600)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={sameAsPoc}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setSameAsPoc(checked)
+                          if (checked) {
+                            const selectedPoc = pocs.find(p => p.id === formData.pocId)
+                            if (selectedPoc) {
+                              setFormData(prev => ({
+                                ...prev,
+                                recipientName: selectedPoc.name,
+                                recipientContact: selectedPoc.email || selectedPoc.phone || "",
+                                recipientBranch: selectedPoc.branch || selectedPoc.location || "",
+                              }))
+                            }
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              recipientName: "",
+                              recipientContact: "",
+                              recipientBranch: "",
+                            }))
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      Same as POC
+                    </label>
+                  </div>
+                  <div className="form-grid" style={{ width: '100%', border: 'none', padding: 0, margin: 0, gap: '12px' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Recipient Name</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={formData.recipientName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, recipientName: e.target.value }))}
+                        placeholder="Enter recipient name"
+                        disabled={sameAsPoc}
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Recipient Contact</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={formData.recipientContact}
+                        onChange={(e) => setFormData(prev => ({ ...prev, recipientContact: e.target.value }))}
+                        placeholder="Enter contact number/email"
+                        disabled={sameAsPoc}
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Recipient Branch/Address</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={formData.recipientBranch}
+                        onChange={(e) => setFormData(prev => ({ ...prev, recipientBranch: e.target.value }))}
+                        placeholder="Enter branch/address"
+                        disabled={sameAsPoc}
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Collaterals / Items Section - Full width */}
@@ -627,73 +892,90 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
                           key={item.id || index}
                           style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
+                            flexDirection: 'column',
+                            gap: '8px',
                             padding: '12px 16px',
                             background: 'var(--gray-50)',
                             borderRadius: '8px',
                             border: '1px solid var(--gray-200)'
                           }}
                         >
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>{item.itemName}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                              {item.quantity > 0 ? (
-                                <>₹{item.unitPrice.toLocaleString('en-IN')} × {item.quantity.toLocaleString('en-IN')} = ₹{item.totalPrice.toLocaleString('en-IN')}</>
-                              ) : (
-                                <span style={{ color: 'var(--gray-400)', fontStyle: 'italic' }}>Enter quantity to calculate price</span>
-                              )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>{item.itemName}</div>
+                              <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                                {item.quantity > 0 ? (
+                                  <>₹{item.unitPrice.toLocaleString('en-IN')} × {item.quantity.toLocaleString('en-IN')} = ₹{item.totalPrice.toLocaleString('en-IN')}</>
+                                ) : (
+                                  <span style={{ color: 'var(--gray-400)', fontStyle: 'italic' }}>Enter quantity to calculate price</span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input
+                                type="number"
+                                className="form-input"
+                                value={item.quantity || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === '') {
+                                    // Allow empty input temporarily
+                                    const updated = [...collaterals]
+                                    updated[index] = { ...item, quantity: 0, totalPrice: 0 }
+                                    setCollaterals(updated)
+                                    updateTotalCost(updated)
+                                  } else {
+                                    const num = parseInt(val)
+                                    if (!isNaN(num) && num >= 0) {
+                                      updateCollateralQuantity(index, num)
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const val = parseInt(e.target.value)
+                                  if (isNaN(val) || val < 1) {
+                                    updateCollateralQuantity(index, 1)
+                                  }
+                                }}
+                                min="1"
+                                style={{ width: '80px', marginBottom: 0, textAlign: 'center' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeCollateral(index)}
+                                style={{
+                                  padding: '8px',
+                                  background: '#fee2e2',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                                title="Remove item"
+                              >
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {/* Item Specification/Description Input */}
+                          <div style={{ width: '100%' }}>
                             <input
-                              type="number"
+                              type="text"
                               className="form-input"
-                              value={item.quantity || ''}
+                              value={item.specification || ""}
                               onChange={(e) => {
-                                const val = e.target.value
-                                if (val === '') {
-                                  // Allow empty input temporarily
-                                  const updated = [...collaterals]
-                                  updated[index] = { ...item, quantity: 0, totalPrice: 0 }
-                                  setCollaterals(updated)
-                                  updateTotalCost(updated)
-                                } else {
-                                  const num = parseInt(val)
-                                  if (!isNaN(num) && num >= 0) {
-                                    updateCollateralQuantity(index, num)
-                                  }
-                                }
+                                const updated = [...collaterals]
+                                updated[index] = { ...item, specification: e.target.value }
+                                setCollaterals(updated)
                               }}
-                              onBlur={(e) => {
-                                const val = parseInt(e.target.value)
-                                if (isNaN(val) || val < 1) {
-                                  updateCollateralQuantity(index, 1)
-                                }
-                              }}
-                              min="1"
-                              style={{ width: '80px', marginBottom: 0, textAlign: 'center' }}
+                              placeholder="Enter item description/specification (optional)"
+                              style={{ fontSize: '13px', padding: '8px 12px', marginBottom: 0, width: '100%' }}
                             />
-                            <button
-                              type="button"
-                              onClick={() => removeCollateral(index)}
-                              style={{
-                                padding: '8px',
-                                background: '#fee2e2',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              title="Remove item"
-                            >
-                              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
                           </div>
                         </div>
                       ))}
@@ -866,75 +1148,91 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
                     <div
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px',
-                        padding: '12px',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        padding: '16px',
                         background: 'rgba(0, 168, 204, 0.05)',
                         borderRadius: '8px',
                         border: '1px dashed var(--axis-accent)',
                         marginTop: '16px'
                       }}
                     >
-                      <select
-                        className="form-select"
-                        value={selectedRateCardItem}
-                        onChange={(e) => setSelectedRateCardItem(e.target.value)}
-                        style={{ flex: 1, marginBottom: 0, height: '38px' }}
-                      >
-                        <option value="">Select item...</option>
-                        {rateCardItems.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={newItemQuantity}
-                        onChange={(e) => setNewItemQuantity(e.target.value)}
-                        placeholder="Qty"
-                        min="1"
-                        style={{ flex: 1, marginBottom: 0, height: '38px' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={addCollateral}
-                        disabled={!selectedRateCardItem || !parseInt(newItemQuantity)}
-                        style={{
-                          padding: '6px 12px',
-                          background: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#e5e7eb' : 'var(--axis-accent)',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? 'not-allowed' : 'pointer',
-                          color: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#9ca3af' : 'white',
-                          fontWeight: 600,
-                          fontSize: '13px'
-                        }}
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAddItemForm(false)
-                          setSelectedRateCardItem('')
-                          setNewItemQuantity('')
-                        }}
-                        style={{
-                          padding: '6px',
-                          background: 'transparent',
-                          border: '1px solid var(--gray-300)',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          color: 'var(--gray-600)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
+                        <select
+                          className="form-select"
+                          value={selectedRateCardItem}
+                          onChange={(e) => setSelectedRateCardItem(e.target.value)}
+                          style={{ flex: 2, marginBottom: 0, height: '38px' }}
+                        >
+                          <option value="">Select item...</option>
+                          {rateCardItems.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={newItemQuantity}
+                          onChange={(e) => setNewItemQuantity(e.target.value)}
+                          placeholder="Qty"
+                          min="1"
+                          style={{ flex: 1, marginBottom: 0, height: '38px', maxWidth: '100px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={addCollateral}
+                          disabled={!selectedRateCardItem || !parseInt(newItemQuantity)}
+                          style={{
+                            padding: '6px 16px',
+                            background: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#e5e7eb' : 'var(--axis-accent)',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? 'not-allowed' : 'pointer',
+                            color: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#9ca3af' : 'white',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            height: '38px'
+                          }}
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddItemForm(false)
+                            setSelectedRateCardItem('')
+                            setNewItemQuantity('')
+                            setNewItemSpecification('')
+                          }}
+                          style={{
+                            padding: '6px',
+                            background: 'transparent',
+                            border: '1px solid var(--gray-300)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: 'var(--gray-600)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '38px',
+                            width: '38px'
+                          }}
+                        >
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div style={{ width: '100%' }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={newItemSpecification}
+                          onChange={(e) => setNewItemSpecification(e.target.value)}
+                          placeholder="Enter item description/specification (optional)"
+                          style={{ fontSize: '13px', padding: '8px 12px', marginBottom: 0, width: '100%' }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -952,6 +1250,7 @@ const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
                   />
                   {errors.deliveryDate && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.deliveryDate}</p>}
                 </div>
+
 
               </div>
 
