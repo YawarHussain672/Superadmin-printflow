@@ -132,22 +132,28 @@ export function TopBar({ user }: TopBarProps) {
           projectId: string; 
           name: string; 
           poc?: { name: string }; 
+          pocName?: string | null;
           client?: { name: string };
+          clientName?: string | null;
           location: string; 
           status: string; 
           deliveryDate: string; 
           totalCost: number 
-        }) => [
-          p.projectId,
-          p.name.slice(0, 30),
-          p.poc?.name 
-            ? `${p.poc.name} (POC)${p.client?.name ? `\non behalf of\n${p.client.name} (CLIENT)` : ''}`
-            : (p.client?.name ? `${p.client.name} (CLIENT)` : "—"),
-          p.location,
-          p.status,
-          new Date(p.deliveryDate).toLocaleDateString("en-IN"),
-          `Rs. ${p.totalCost.toLocaleString("en-US")}`,
-        ]),
+        }) => {
+          const pocName = p.poc?.name || p.pocName
+          const clientName = p.client?.name || p.clientName
+          return [
+            p.projectId,
+            p.name.slice(0, 30),
+            pocName 
+              ? `${pocName} (POC)${clientName ? `\non behalf of\n${clientName} (CLIENT)` : ''}`
+              : (clientName ? `${clientName} (CLIENT)` : "—"),
+            p.location,
+            p.status,
+            new Date(p.deliveryDate).toLocaleDateString("en-IN"),
+            `Rs. ${p.totalCost.toLocaleString("en-US")}`,
+          ]
+        }),
         startY: 28,
         styles: { fontSize: 8, cellPadding: 3, valign: "middle" },
         headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },

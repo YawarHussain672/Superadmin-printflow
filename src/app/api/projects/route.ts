@@ -182,12 +182,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Clients cannot create projects" }, { status: 403 })
     }
 
+    let pocName: string | null = null
+    let clientName: string | null = null
+
     // Validate POC if provided
     if (pocId) {
       const poc = await prisma.user.findUnique({ where: { id: pocId } })
       if (!poc || !poc.active || poc.role !== "POC") {
         return NextResponse.json({ error: "Invalid POC selected" }, { status: 400 })
       }
+      pocName = poc.name
     }
 
     // Validate Client if provided
@@ -196,6 +200,7 @@ export async function POST(request: NextRequest) {
       if (!client || !client.active || client.role !== "CLIENT") {
         return NextResponse.json({ error: "Invalid Client selected" }, { status: 400 })
       }
+      clientName = client.name
     }
 
     // POCs can create projects for themselves OR for clients
@@ -242,7 +247,9 @@ export async function POST(request: NextRequest) {
         name,
         description,
         pocId,
+        pocName,
         clientId,
+        clientName,
         location,
         branch,
         state,
@@ -313,8 +320,8 @@ export async function POST(request: NextRequest) {
 
     // Step C: Notify all admins via DB notification + email
     try {
-      const pocName = project.poc?.name || "A user"
-      const clientName = project.client?.name
+      const pocName = project.poc?.name || project.pocName || "A user"
+      const clientName = project.client?.name || project.clientName || undefined
       console.log(`[PROJECT CREATED] Sending admin notifications → pocName="${pocName}" clientName="${clientName}"`)
       await notifyAdminsNewApproval(project.id, project.name, project.projectId, pocName, clientName)
       console.log(`[PROJECT CREATED] Admin notifications completed for ${project.projectId}`)

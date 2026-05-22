@@ -15,7 +15,7 @@ import { formatDate, formatCurrency } from "@/utils/formatters"
 
 type ProjectWithPoc = Prisma.ProjectGetPayload<{
   include: { poc: { select: { name: true } } }
-}>
+}> & { pocName?: string | null }
 
 interface RecentProjectsTableProps {
   projects: ProjectWithPoc[]
@@ -61,7 +61,7 @@ export function RecentProjectsTable({ projects }: RecentProjectsTableProps) {
               {project.location}
               {project.state && `, ${project.state}`}
             </TableCell>
-            <TableCell className="text-slate-600">{project.poc?.name || "Unknown"}</TableCell>
+            <TableCell className="text-slate-600">{project.poc?.name || project.pocName || "Unknown"}</TableCell>
             <TableCell>
               <Badge variant={statusVariants[project.status] as Parameters<typeof Badge>[0]["variant"]}>
                 {project.status}

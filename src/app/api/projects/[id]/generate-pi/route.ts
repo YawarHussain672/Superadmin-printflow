@@ -90,13 +90,13 @@ export async function POST(
       totalCost: project.totalCost,
       packingCharges: project.packingCharges,
       packingChargesGstRate: project.packingChargesGstRate,
-      pocName: project.poc?.name,
-      pocEmail: project.poc?.email,
-      clientName: project.client?.name,
-      clientEmail: project.client?.email,
-      clientLocation: project.client?.location,
-      clientPan: project.client?.clientPan,
-      clientGst: project.client?.clientGst,
+      pocName: project.poc?.name || project.pocName || undefined,
+      pocEmail: project.poc?.email || undefined,
+      clientName: project.client?.name || project.clientName || undefined,
+      clientEmail: project.client?.email || undefined,
+      clientLocation: project.client?.location || undefined,
+      clientPan: project.client?.clientPan || undefined,
+      clientGst: project.client?.clientGst || undefined,
       deliveryAddress: `${project.location}${project.state ? `, ${project.state}` : ""}`,
       recipientName: project.recipientName,
       recipientContact: project.recipientContact,
@@ -129,7 +129,7 @@ export async function POST(
       project.id,
       project.name,
       piNumber,
-      project.poc?.name || "Unknown"
+      project.poc?.name || project.pocName || "Unknown"
     )
 
     // Sign the URL so the client can view/download from the private bucket

@@ -253,13 +253,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (!isAdmin && pocId !== session.user.id) {
         return NextResponse.json({ error: "POCs cannot reassign project ownership" }, { status: 403 })
       }
+      const poc = await prisma.user.findUnique({ where: { id: pocId } })
+      if (!poc) {
+        return NextResponse.json({ error: "Invalid POC selected" }, { status: 400 })
+      }
       updateData.poc = { connect: { id: pocId } }
+      updateData.pocName = poc.name
     }
     if (clientId !== undefined) {
       if (clientId === "" || clientId === null) {
         updateData.client = { disconnect: true }
+        updateData.clientName = null
       } else {
+        const client = await prisma.user.findUnique({ where: { id: clientId } })
+        if (!client) {
+          return NextResponse.json({ error: "Invalid Client selected" }, { status: 400 })
+        }
         updateData.client = { connect: { id: clientId } }
+        updateData.clientName = client.name
       }
     }
     if (location !== undefined) updateData.location = location
@@ -447,13 +458,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             totalCost: freshProject.totalCost,
             packingCharges: freshProject.packingCharges,
             packingChargesGstRate: freshProject.packingChargesGstRate,
-            pocName: freshProject.poc?.name,
-            pocEmail: freshProject.poc?.email,
-            clientName: freshProject.client?.name,
-            clientEmail: freshProject.client?.email,
-            clientLocation: freshProject.client?.location,
-            clientPan: freshProject.client?.clientPan,
-            clientGst: freshProject.client?.clientGst,
+            pocName: freshProject.poc?.name || freshProject.pocName || undefined,
+            pocEmail: freshProject.poc?.email || undefined,
+            clientName: freshProject.client?.name || freshProject.clientName || undefined,
+            clientEmail: freshProject.client?.email || undefined,
+            clientLocation: freshProject.client?.location || undefined,
+            clientPan: freshProject.client?.clientPan || undefined,
+            clientGst: freshProject.client?.clientGst || undefined,
             deliveryAddress: `${freshProject.location}${freshProject.state ? `, ${freshProject.state}` : ""}`,
             recipientName: freshProject.recipientName,
             recipientContact: freshProject.recipientContact,
@@ -484,7 +495,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             freshProject.id,
             freshProject.name,
             freshProject.piNumber!,
-            freshProject.poc?.name || "Unknown"
+            freshProject.poc?.name || freshProject.pocName || "Unknown"
           )
 
           await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { id })

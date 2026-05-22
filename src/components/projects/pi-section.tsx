@@ -16,6 +16,7 @@ interface PISectionProps {
   userId: string
   pocId?: string | null
   clientId?: string | null
+  onUpdate?: () => void
 }
 
 export function PISection({
@@ -29,6 +30,7 @@ export function PISection({
   userId,
   pocId,
   clientId,
+  onUpdate,
 }: PISectionProps) {
   const router = useRouter()
   // Local state for real-time updates
@@ -74,6 +76,7 @@ export function PISection({
         setPiGeneratedAt(data.project.piGeneratedAt)
         toast.success(data.message)
         router.refresh()
+        onUpdate?.()
       } else {
         toast.error(data.error || "Failed to generate PI")
       }
@@ -101,6 +104,7 @@ export function PISection({
         setPiVerifiedAt(data.project.piVerifiedAt)
         toast.success(data.message)
         router.refresh()
+        onUpdate?.()
       } else {
         toast.error(data.error || "Failed to verify PI")
       }
@@ -132,6 +136,7 @@ export function PISection({
         setRejectNotes("")
         toast.success(data.message)
         router.refresh()
+        onUpdate?.()
       } else {
         toast.error(data.error || "Failed to reject PI")
       }

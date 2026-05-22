@@ -4,6 +4,7 @@ import Link from "next/link"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { DashboardRealtimeRefresh } from "@/components/dashboard/dashboard-realtime-refresh"
 
 // SVG Icons matching HTML file
 const FolderIcon = () => (
@@ -124,6 +125,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      <DashboardRealtimeRefresh />
       {/* Page Header */}
       <div className="page-header">
         <h1 className="page-title">
@@ -223,7 +225,7 @@ export default async function DashboardPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {/* Line 1: POC */}
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                          {project.poc?.name}
+                          {project.poc?.name || project.pocName || "—"}
                           <span style={{
                             fontSize: '10px',
                             padding: '2px 8px',
@@ -246,15 +248,15 @@ export default async function DashboardPage() {
                           </span>
                         </span>
                         {/* Line 2: on behalf of */}
-                        {project.client && (
+                        {(project.client?.name || project.clientName) && (
                           <span style={{ color: 'var(--gray-400)', fontSize: '11px', paddingLeft: '8px' }}>
                             on behalf of
                           </span>
                         )}
                         {/* Line 3: Client */}
-                        {project.client && (
+                        {(project.client?.name || project.clientName) && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                            {project.client.name}
+                            {project.client?.name || project.clientName}
                             <span style={{
                               fontSize: '10px',
                               padding: '2px 8px',

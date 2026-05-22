@@ -56,7 +56,9 @@ model Project {
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   pocId                 String?
+  pocName               String?
   clientId              String?
+  clientName            String?
   branch                String?
   recipientName         String?
   recipientContact      String?

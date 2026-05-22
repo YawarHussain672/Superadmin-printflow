@@ -3,14 +3,23 @@ import { pusherServer, CHANNELS, EVENTS } from "./pusher"
 import { sendProjectApprovedEmail, sendProjectRejectedEmail, sendPIRejectedEmail, sendAdminNewProjectEmail, sendAdminPIPendingEmail } from "./email"
 
 export async function createNotification(data: {
-  userId: string
+  userId: string | null | undefined
   title: string
   message: string
   type: string
   link?: string
 }) {
+  if (!data.userId) return
   try {
-    await prisma.notification.create({ data })
+    await prisma.notification.create({
+      data: {
+        userId: data.userId,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        link: data.link,
+      }
+    })
     // Trigger real-time update
     await pusherServer.trigger(CHANNELS.NOTIFICATIONS, EVENTS.NOTIFICATION_CREATED, { userId: data.userId })
   } catch (error) {

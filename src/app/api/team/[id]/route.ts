@@ -25,10 +25,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+    const nameChanged = name !== undefined && name !== existingUser.name
+
     const user = await prisma.user.update({
       where: { id },
       data: { name, phone, role, active, location, branch },
     })
+
+    if (nameChanged) {
+      if (user.role === "POC") {
+        await prisma.project.updateMany({
+          where: { pocId: id },
+          data: { pocName: name },
+        })
+      } else if (user.role === "CLIENT") {
+        await prisma.project.updateMany({
+          where: { clientId: id },
+          data: { clientName: name },
+        })
+      }
+    }
 
     const safeUser = {
       id: user.id,

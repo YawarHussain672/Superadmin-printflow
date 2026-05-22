@@ -82,11 +82,11 @@ export default async function ApprovalsPage() {
                     </h3>
                     <p style={{ fontSize: '14px', color: 'var(--gray-600)' }}>
                       <strong>Requested by:</strong> {approval.requestedBy?.name}
-                      {approval.project.poc && (
-                        <span> | <strong>POC:</strong> {approval.project.poc.name}</span>
+                      {(approval.project.poc || approval.project.pocName) && (
+                        <span> | <strong>POC:</strong> {approval.project.poc?.name || approval.project.pocName}</span>
                       )}
-                      {approval.project.client && (
-                        <span> | <strong>Client:</strong> {approval.project.client.name}</span>
+                      {(approval.project.client || approval.project.clientName) && (
+                        <span> | <strong>Client:</strong> {approval.project.client?.name || approval.project.clientName}</span>
                       )}
                       <span> | <strong>Location:</strong> {approval.project.location}{approval.project.state ? `, ${approval.project.state}` : ""}</span>
                     </p>

@@ -9,6 +9,7 @@ import { EditProjectDialog } from "@/components/projects/edit-project-dialog"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { toast } from "sonner"
 import { CITIES } from "@/lib/branch-locations"
+import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
 
 const PAGE_SIZE = 20
 
@@ -33,11 +34,14 @@ interface Project {
   packingChargesGstRate?: number | null
   poc?: { id: string; name: string; role?: string }
   client?: { id: string; name: string; role?: string }
+  pocName?: string | null
+  clientName?: string | null
   collaterals?: { id?: string; itemName: string; quantity: number; unitPrice?: number; totalPrice?: number; gstRate?: number | null; gstAmount?: number | null }[]
   recipientName?: string | null
   recipientContact?: string | null
   recipientBranch?: string | null
   piNumber?: string | null
+  dispatch?: { courier: string; trackingId: string } | null
 }
 
 // SVG Icons
@@ -174,6 +178,35 @@ export function ProjectsPageClient() {
     }
   }, [handleProjectCreated, handleProjectDeleted])
 
+  useEffect(() => {
+    const client = getPusherClient()
+    const channel = client.subscribe(CHANNELS.PROJECTS)
+
+    const handleCreated = () => {
+      fetchData()
+      router.refresh()
+    }
+    const handleUpdated = () => {
+      fetchData()
+      router.refresh()
+    }
+    const handleDeleted = () => {
+      fetchData()
+      router.refresh()
+    }
+
+    channel.bind(EVENTS.PROJECT_CREATED, handleCreated)
+    channel.bind(EVENTS.PROJECT_UPDATED, handleUpdated)
+    channel.bind(EVENTS.PROJECT_DELETED, handleDeleted)
+
+    return () => {
+      channel.unbind(EVENTS.PROJECT_CREATED, handleCreated)
+      channel.unbind(EVENTS.PROJECT_UPDATED, handleUpdated)
+      channel.unbind(EVENTS.PROJECT_DELETED, handleDeleted)
+      client.unsubscribe(CHANNELS.PROJECTS)
+    }
+  }, [fetchData, router])
+
   const handleDelete = async (projectId: string) => {
     if (!confirm("Are you sure you want to delete this project?")) return
     try {
@@ -283,7 +316,7 @@ export function ProjectsPageClient() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           {/* Line 1: POC */}
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                            {project.poc?.name || "—"}
+                            {project.poc?.name || project.pocName || "—"}
                             <span style={{
                               fontSize: '10px',
                               padding: '2px 8px',
@@ -306,15 +339,15 @@ export function ProjectsPageClient() {
                             </span>
                           </span>
                           {/* Line 2: on behalf of */}
-                          {project.client && (
+                          {(project.client || project.clientName) && (
                             <span style={{ color: 'var(--gray-400)', fontSize: '11px', paddingLeft: '8px' }}>
                               on behalf of
                             </span>
                           )}
                           {/* Line 3: Client */}
-                          {project.client && (
+                          {(project.client || project.clientName) && (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                              {project.client.name}
+                              {project.client?.name || project.clientName}
                               <span style={{
                                 fontSize: '10px',
                                 padding: '2px 8px',
@@ -467,6 +500,7 @@ export function ProjectsPageClient() {
             pocId: editingProject.poc?.id || '',
             clientId: editingProject.client?.id || '',
             location: editingProject.location,
+            branch: editingProject.branch,
             state: editingProject.state || '',
             deliveryDate: editingProject.deliveryDate,
             status: editingProject.status,
@@ -487,6 +521,7 @@ export function ProjectsPageClient() {
             recipientContact: editingProject.recipientContact,
             recipientBranch: editingProject.recipientBranch,
             piNumber: editingProject.piNumber,
+            dispatch: editingProject.dispatch,
           }}
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}

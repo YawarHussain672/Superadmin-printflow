@@ -10,8 +10,8 @@ import { BRANCH_LOCATIONS, CITIES } from "@/lib/branch-locations"
 interface Project {
   id: string
   name: string
-  pocId: string
-  clientId: string
+  pocId: string | null
+  clientId: string | null
   location: string
   branch?: string | null
   state: string
@@ -136,8 +136,10 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   useEffect(() => {
     if (!open) {
       setLoadedProjectId(null)
+      setErrors({})
       return
     }
+    setErrors({})
     if (!project) return
     if (project.id === loadedProjectId) return
 
@@ -882,6 +884,100 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                     </div>
                   </div>
 
+                  {/* Add new item form - hidden by default */}
+                  {showAddItemForm && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        padding: '16px',
+                        background: 'rgba(0, 168, 204, 0.05)',
+                        borderRadius: '8px',
+                        border: '1px dashed var(--axis-accent)',
+                        marginTop: '8px',
+                        marginBottom: '16px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
+                        <select
+                          className="form-select"
+                          value={selectedRateCardItem}
+                          onChange={(e) => setSelectedRateCardItem(e.target.value)}
+                          style={{ flex: 2, marginBottom: 0, height: '38px' }}
+                        >
+                          <option value="">Select item...</option>
+                          {rateCardItems.map((item) => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={newItemQuantity}
+                          onChange={(e) => setNewItemQuantity(e.target.value)}
+                          placeholder="Qty"
+                          min="1"
+                          style={{ flex: 1, marginBottom: 0, height: '38px', maxWidth: '100px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={addCollateral}
+                          disabled={!selectedRateCardItem || !parseInt(newItemQuantity)}
+                          style={{
+                            padding: '6px 16px',
+                            background: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#e5e7eb' : 'var(--axis-accent)',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? 'not-allowed' : 'pointer',
+                            color: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#9ca3af' : 'white',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            height: '38px'
+                          }}
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddItemForm(false)
+                            setSelectedRateCardItem('')
+                            setNewItemQuantity('')
+                            setNewItemSpecification('')
+                          }}
+                          style={{
+                            padding: '6px',
+                            background: 'transparent',
+                            border: '1px solid var(--gray-300)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: 'var(--gray-600)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '38px',
+                            width: '38px'
+                          }}
+                        >
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div style={{ width: '100%' }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={newItemSpecification}
+                          onChange={(e) => setNewItemSpecification(e.target.value)}
+                          placeholder="Enter item description/specification (optional)"
+                          style={{ fontSize: '13px', padding: '8px 12px', marginBottom: 0, width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* List of existing items - Simple clean view */}
                   {collaterals.length === 0 ? (
                     <p style={{ color: 'var(--gray-500)', fontSize: '14px', fontStyle: 'italic', padding: '12px 0' }}>No items added yet</p>
@@ -1139,99 +1235,6 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                         <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--axis-primary)' }}>
                           ₹{grandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Add new item form - hidden by default */}
-                  {showAddItemForm && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        padding: '16px',
-                        background: 'rgba(0, 168, 204, 0.05)',
-                        borderRadius: '8px',
-                        border: '1px dashed var(--axis-accent)',
-                        marginTop: '16px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
-                        <select
-                          className="form-select"
-                          value={selectedRateCardItem}
-                          onChange={(e) => setSelectedRateCardItem(e.target.value)}
-                          style={{ flex: 2, marginBottom: 0, height: '38px' }}
-                        >
-                          <option value="">Select item...</option>
-                          {rateCardItems.map((item) => (
-                            <option key={item.id} value={item.id}>{item.name}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          className="form-input"
-                          value={newItemQuantity}
-                          onChange={(e) => setNewItemQuantity(e.target.value)}
-                          placeholder="Qty"
-                          min="1"
-                          style={{ flex: 1, marginBottom: 0, height: '38px', maxWidth: '100px' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={addCollateral}
-                          disabled={!selectedRateCardItem || !parseInt(newItemQuantity)}
-                          style={{
-                            padding: '6px 16px',
-                            background: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#e5e7eb' : 'var(--axis-accent)',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? 'not-allowed' : 'pointer',
-                            color: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#9ca3af' : 'white',
-                            fontWeight: 600,
-                            fontSize: '13px',
-                            height: '38px'
-                          }}
-                        >
-                          Add
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAddItemForm(false)
-                            setSelectedRateCardItem('')
-                            setNewItemQuantity('')
-                            setNewItemSpecification('')
-                          }}
-                          style={{
-                            padding: '6px',
-                            background: 'transparent',
-                            border: '1px solid var(--gray-300)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            color: 'var(--gray-600)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            height: '38px',
-                            width: '38px'
-                          }}
-                        >
-                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div style={{ width: '100%' }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={newItemSpecification}
-                          onChange={(e) => setNewItemSpecification(e.target.value)}
-                          placeholder="Enter item description/specification (optional)"
-                          style={{ fontSize: '13px', padding: '8px 12px', marginBottom: 0, width: '100%' }}
-                        />
                       </div>
                     </div>
                   )}
