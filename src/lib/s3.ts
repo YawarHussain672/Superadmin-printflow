@@ -16,6 +16,9 @@ export async function uploadToS3(
   key: string,
   contentType: string
 ): Promise<string> {
+  console.log("DEBUG: inside uploadToS3");
+  console.log("DEBUG: BUCKET_NAME is:", BUCKET_NAME);
+  console.log("DEBUG: process.env.AWS_BUCKET is:", process.env.AWS_BUCKET);
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,

@@ -66,21 +66,29 @@ export function PISection({
       const res = await fetch(`/api/projects/${projectId}/generate-pi`, {
         method: "POST",
       })
-      const data = await res.json()
+      
+      let data: any = {}
+      const contentType = res.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json()
+      } else {
+        console.error("Received non-JSON response from generate-pi")
+      }
 
       if (res.ok) {
         // Update local state immediately for real-time UI update
-        setPiNumber(data.project.piNumber)
-        setPiStatus(data.project.piStatus)
-        setPiPdfUrl(data.project.piPdfUrl)
-        setPiGeneratedAt(data.project.piGeneratedAt)
-        toast.success(data.message)
+        setPiNumber(data.project?.piNumber)
+        setPiStatus(data.project?.piStatus)
+        setPiPdfUrl(data.project?.piPdfUrl)
+        setPiGeneratedAt(data.project?.piGeneratedAt)
+        toast.success(data.message || "PI generated successfully.")
         router.refresh()
         onUpdate?.()
       } else {
-        toast.error(data.error || "Failed to generate PI")
+        toast.error(data.error || `Server error (${res.status}): Failed to generate PI`)
       }
     } catch (error) {
+      console.error("Error in handleGeneratePI:", error)
       toast.error("Network error. Please try again.")
     } finally {
       setIsGenerating(false)
@@ -96,19 +104,27 @@ export function PISection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify" }),
       })
-      const data = await res.json()
+      
+      let data: any = {}
+      const contentType = res.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json()
+      } else {
+        console.error("Received non-JSON response from verify-pi")
+      }
 
       if (res.ok) {
         // Update local state immediately
-        setPiStatus(data.project.piStatus)
-        setPiVerifiedAt(data.project.piVerifiedAt)
-        toast.success(data.message)
+        setPiStatus(data.project?.piStatus)
+        setPiVerifiedAt(data.project?.piVerifiedAt)
+        toast.success(data.message || "PI verified successfully.")
         router.refresh()
         onUpdate?.()
       } else {
-        toast.error(data.error || "Failed to verify PI")
+        toast.error(data.error || `Server error (${res.status}): Failed to verify PI`)
       }
     } catch (error) {
+      console.error("Error in handleVerifyPI:", error)
       toast.error("Network error. Please try again.")
     } finally {
       setIsVerifying(false)
@@ -124,23 +140,31 @@ export function PISection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reject", notes: rejectNotes }),
       })
-      const data = await res.json()
+      
+      let data: any = {}
+      const contentType = res.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json()
+      } else {
+        console.error("Received non-JSON response from verify-pi")
+      }
 
       if (res.ok) {
         // Update local state immediately
-        setPiStatus(data.project.piStatus)
+        setPiStatus(data.project?.piStatus)
         setPiPdfUrl(null)
         setPiNumber(null)
         setPiGeneratedAt(null)
         setShowRejectDialog(false)
         setRejectNotes("")
-        toast.success(data.message)
+        toast.success(data.message || "PI rejected successfully.")
         router.refresh()
         onUpdate?.()
       } else {
-        toast.error(data.error || "Failed to reject PI")
+        toast.error(data.error || `Server error (${res.status}): Failed to reject PI`)
       }
     } catch (error) {
+      console.error("Error in handleRejectPI:", error)
       toast.error("Network error. Please try again.")
     } finally {
       setIsVerifying(false)

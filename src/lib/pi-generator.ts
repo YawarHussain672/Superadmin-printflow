@@ -106,14 +106,22 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFont("times", "normal")
   doc.setFontSize(9)
   let custY = detailsY + 13
-  doc.text(project.clientName || project.pocName || "N/A", 12, custY)
-  custY += 4.5
-  if (project.clientLocation) {
-    doc.text(project.clientLocation, 12, custY)
+  if (project.clientName) {
+    doc.text(project.clientName, 12, custY)
     custY += 4.5
+    if (project.clientLocation) {
+      doc.text(project.clientLocation, 12, custY)
+      custY += 4.5
+    }
+  } else {
+    doc.text(project.pocName || "N/A", 12, custY)
+    custY += 4.5
+    const locStr = `${project.location || ""}${project.state ? `, ${project.state}` : ""}`
+    if (locStr) {
+      doc.text(locStr, 12, custY)
+      custY += 4.5
+    }
   }
-  doc.text(`${project.location || ""}${project.state ? `, ${project.state}` : ""}`, 12, custY)
-  custY += 4.5
   doc.text(`PAN/IT No : ${project.clientPan || ""}`, 12, custY)
   custY += 4.5
   doc.text(`GST No. : ${project.clientGst || ""}`, 12, custY)
@@ -161,27 +169,65 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === SECOND ROW BOXES ===
   const secondRowY = detailsY + boxHeight + 2
-  const hasRecipientDetails = Boolean(project.recipientBranch)
-  const secondRowHeight = hasRecipientDetails ? 24 : 15
+  const secondRowHeight = 24
 
   // Delivery Address
   doc.setFont("times", "bold")
+  doc.setFontSize(10)
   doc.text("Delivery Address", 12, secondRowY + 6)
   doc.setFont("times", "normal")
-  doc.setFontSize(9)
-  if (project.recipientBranch) {
-    const addressLines = doc.splitTextToSize(project.recipientBranch.trim(), colWidth - 4)
-    addressLines.forEach((line: string, index: number) => {
-      doc.text(line, 12, secondRowY + 12 + index * 4.5)
-    })
+
+  const deliveryLines: string[] = []
+  if (project.recipientName) {
+    deliveryLines.push(`Name: ${project.recipientName.trim()}`)
   }
+  if (project.recipientContact) {
+    deliveryLines.push(`Contact: ${project.recipientContact.trim()}`)
+  }
+  if (project.recipientBranch) {
+    const addrLines = doc.splitTextToSize(project.recipientBranch.trim(), colWidth - 4)
+    deliveryLines.push(...addrLines)
+  }
+
+  if (deliveryLines.length === 0) {
+    const fallbackAddr = project.deliveryAddress || `${project.location || ""}${project.state ? `, ${project.state}` : ""}`
+    if (fallbackAddr.trim()) {
+      const addrLines = doc.splitTextToSize(fallbackAddr.trim(), colWidth - 4)
+      deliveryLines.push(...addrLines)
+    }
+  }
+
+  let fontSize = 8.5
+  let lineSpacing = 4.0
+
+  if (deliveryLines.length > 4) {
+    fontSize = 7.0
+    lineSpacing = 2.9
+  } else if (deliveryLines.length === 4) {
+    fontSize = 7.5
+    lineSpacing = 3.3
+  } else if (deliveryLines.length === 3) {
+    fontSize = 8.0
+    lineSpacing = 3.8
+  }
+
+  doc.setFontSize(fontSize)
+  deliveryLines.forEach((line: string, index: number) => {
+    const lineY = secondRowY + 11.5 + index * lineSpacing
+    if (lineY < secondRowY + 23.5) {
+      doc.text(line, 12, lineY)
+    }
+  })
+
   doc.rect(10, secondRowY, colWidth, secondRowHeight)
   doc.line(10, secondRowY + 8, 10 + colWidth, secondRowY + 8)
 
   // Terms of Delivery
   doc.setFont("times", "bold")
+  doc.setFontSize(10)
   doc.text("Terms of Delivery", rightBoxX + 2, secondRowY + 6)
   doc.setFont("times", "normal")
+  doc.setFontSize(9)
   doc.text(`POC: ${project.pocName || "N/A"}`, rightBoxX + 2, secondRowY + 12)
   doc.rect(10 + colWidth, secondRowY, colWidth, secondRowHeight)
   doc.line(10 + colWidth, secondRowY + 8, 10 + colWidth * 2, secondRowY + 8)

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -142,24 +142,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Database transaction failed", details: txError instanceof Error ? txError.message : String(txError) }, { status: 500 })
       }
 
-      // Send rejection email + in-app notification to POC (if POC still exists)
-      if (approval.project.poc) {
-        try {
-          await sendProjectRejectedEmail(approval.project.poc.email, {
-            pocName: approval.project.poc.name,
-            projectName: approval.project.name,
-            projectId: approval.project.projectId,
-            reason: notesText,
-            appUrl: APP_URL,
-          })
-        } catch (emailError) {
-          console.error("[EMAIL ERROR] Failed to send project rejected email:", emailError)
-        }
-
-        // In-app notification
-        await notifyProjectRejected(approval.projectId, approval.project.poc.id, approval.project.name, approval.project.projectId, notesText)
-      }
-
       // Audit log
       await logActivity({
         userId: session.user.id,
@@ -175,22 +157,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: { reminderCount: { increment: 1 } },
       })
 
-      // Send Pending PO reminder email to POC (not admins)
-      if (approval.project.poc?.email) {
-        try {
-          await sendPendingPOReminderEmail(approval.project.poc.email, {
-            pocName: approval.project.poc.name,
-            projectName: approval.project.name,
-            piNumber: approval.project.piNumber || approval.project.projectId,
-            piDate: new Date(approval.project.createdAt).toLocaleDateString('en-IN'),
-            piAmount: formatCurrency(approval.project.grandTotal),
-            appUrl: APP_URL,
-          })
-        } catch (emailError) {
-          console.error("[EMAIL ERROR] Failed to send PO reminder email:", emailError)
-        }
-      }
-
       // Audit log
       await logActivity({
         userId: session.user.id,
@@ -201,9 +167,97 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       })
     }
 
-    await pusherServer.trigger(CHANNELS.APPROVALS, EVENTS.APPROVAL_UPDATED, { id })
-    await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { projectId: approval.projectId })
-    await pusherServer.trigger(CHANNELS.DASHBOARD, EVENTS.STATS_UPDATED, {})
+    after(async () => {
+      try {
+        if (action === "approve") {
+          if (approval.project.poc) {
+            try {
+              await sendProjectApprovedEmail(approval.project.poc.email, {
+                pocName: approval.project.poc.name,
+                projectName: approval.project.name,
+                projectId: approval.project.projectId,
+                location: approval.project.location,
+                totalCost: formatCurrency(approval.project.grandTotal),
+                appUrl: APP_URL,
+              })
+            } catch (emailError) {
+              console.error("[EMAIL ERROR] Failed to send project approved email:", emailError)
+            }
+
+            try {
+              await notifyProjectApproved(
+                approval.projectId,
+                approval.project.poc.id,
+                approval.project.name,
+                approval.project.projectId
+              )
+            } catch (notifError) {
+              console.error("Failed to send project approved notification:", notifError)
+            }
+          }
+        } else if (action === "reject") {
+          if (approval.project.poc) {
+            try {
+              await sendProjectRejectedEmail(approval.project.poc.email, {
+                pocName: approval.project.poc.name,
+                projectName: approval.project.name,
+                projectId: approval.project.projectId,
+                reason: notesText,
+                appUrl: APP_URL,
+              })
+            } catch (emailError) {
+              console.error("[EMAIL ERROR] Failed to send project rejected email:", emailError)
+            }
+
+            try {
+              await notifyProjectRejected(
+                approval.projectId,
+                approval.project.poc.id,
+                approval.project.name,
+                approval.project.projectId,
+                notesText
+              )
+            } catch (notifError) {
+              console.error("Failed to send project rejected notification:", notifError)
+            }
+          }
+        } else if (action === "reminder") {
+          if (approval.project.poc?.email) {
+            try {
+              await sendPendingPOReminderEmail(approval.project.poc.email, {
+                pocName: approval.project.poc.name,
+                projectName: approval.project.name,
+                piNumber: approval.project.piNumber || approval.project.projectId,
+                piDate: new Date(approval.project.createdAt).toLocaleDateString('en-IN'),
+                piAmount: formatCurrency(approval.project.grandTotal),
+                appUrl: APP_URL,
+              })
+            } catch (emailError) {
+              console.error("[EMAIL ERROR] Failed to send PO reminder email:", emailError)
+            }
+          }
+        }
+
+        // Trigger pusher notifications
+        try {
+          await pusherServer.trigger(CHANNELS.APPROVALS, EVENTS.APPROVAL_UPDATED, { id })
+        } catch (pusherError) {
+          console.error("Failed to trigger Pusher APPROVALS:", pusherError)
+        }
+        try {
+          await pusherServer.trigger(CHANNELS.PROJECTS, EVENTS.PROJECT_UPDATED, { projectId: approval.projectId })
+        } catch (pusherError) {
+          console.error("Failed to trigger Pusher PROJECTS:", pusherError)
+        }
+        try {
+          await pusherServer.trigger(CHANNELS.DASHBOARD, EVENTS.STATS_UPDATED, {})
+        } catch (pusherError) {
+          console.error("Failed to trigger Pusher DASHBOARD:", pusherError)
+        }
+      } catch (afterError) {
+        console.error("Failed processing tasks in after() hook:", afterError)
+      }
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

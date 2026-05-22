@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -91,34 +91,40 @@ export async function POST(
       },
     })
 
-    // Notifications + email
-    if (action === "verify") {
-      // Send PI Generated email to POC now that it's verified
-      if (project.poc?.email) {
-        await sendPIGeneratedEmail(project.poc.email, {
-          pocName: project.poc.name,
-          projectName: project.name,
-          piNumber: piNumberForLog,
-          piDate: new Date().toLocaleDateString("en-IN"),
-          piAmount: formatCurrency(project.grandTotal),
-          appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-        })
+    // Notifications + email (async after response)
+    after(async () => {
+      try {
+        if (action === "verify") {
+          // Send PI Generated email to POC now that it's verified
+          if (project.poc?.email) {
+            await sendPIGeneratedEmail(project.poc.email, {
+              pocName: project.poc.name,
+              projectName: project.name,
+              piNumber: piNumberForLog,
+              piDate: new Date().toLocaleDateString("en-IN"),
+              piAmount: formatCurrency(project.grandTotal),
+              appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+            })
+          }
+          await notifyPOCPIVerified(
+            project.id,
+            project.name,
+            piNumberForLog,
+            project.pocId || ""
+          )
+        } else {
+          await notifyPOCPIRejected(
+            project.id,
+            project.name,
+            piNumberForLog,
+            project.pocId || "",
+            notes || "No reason provided"
+          )
+        }
+      } catch (error) {
+        console.error("Failed to send PI notification/email in after():", error)
       }
-      await notifyPOCPIVerified(
-        project.id,
-        project.name,
-        piNumberForLog,
-        project.pocId || ""
-      )
-    } else {
-      await notifyPOCPIRejected(
-        project.id,
-        project.name,
-        piNumberForLog,
-        project.pocId || "",
-        notes || "No reason provided"
-      )
-    }
+    })
 
     return NextResponse.json({
       success: true,

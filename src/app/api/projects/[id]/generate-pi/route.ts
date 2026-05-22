@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -125,12 +125,18 @@ export async function POST(
       await deleteS3Asset(previousPiPdfUrl)
     }
 
-    await notifyAdminPIPending(
-      project.id,
-      project.name,
-      piNumber,
-      project.poc?.name || project.pocName || "Unknown"
-    )
+    after(async () => {
+      try {
+        await notifyAdminPIPending(
+          project.id,
+          project.name,
+          piNumber,
+          project.poc?.name || project.pocName || "Unknown"
+        )
+      } catch (error) {
+        console.error("Failed to notify admin of pending PI in after():", error)
+      }
+    })
 
     // Sign the URL so the client can view/download from the private bucket
     const signedPiPdfUrl = await getPresignedUrl(s3Url)
