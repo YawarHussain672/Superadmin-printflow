@@ -448,27 +448,39 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
             )}
 
             {/* Table Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '12px', fontSize: '12px', fontWeight: 800, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '0 8px 8px', borderBottom: '1px solid var(--gray-200)' }}>
-              <div>Item</div>
-              <div>Quantity</div>
-              <div>Rate / Unit</div>
-              <div>Total</div>
-              <div></div>
+            <div style={{ padding: '0 8px 8px', borderBottom: '1px solid var(--gray-200)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.8fr) minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1.5fr) 36px', gap: '12px', fontSize: '12px', fontWeight: 800, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ textAlign: 'left', display: 'block', width: '100%' }}>Item</div>
+                <div style={{ textAlign: 'left', display: 'block', width: '100%' }}>Description</div>
+                <div style={{ textAlign: 'left', display: 'block', width: '100%' }}>Quantity</div>
+                <div style={{ textAlign: 'left', display: 'block', width: '100%' }}>Rate / Unit</div>
+                <div style={{ textAlign: 'left', display: 'block', width: '100%' }}>Total</div>
+                <div style={{ width: '36px' }}></div>
+              </div>
             </div>
 
             {/* Collateral Rows */}
             {collaterals.map((collateral, index) => (
               <div key={collateral.id} style={{ padding: '12px 8px', borderBottom: '1px solid var(--gray-100)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '12px', alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.8fr) minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1.5fr) 36px', gap: '12px', alignItems: 'center' }}>
                   <select
                     className="form-select"
                     value={collateral.itemName}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateCollateral(collateral.id, "itemName", e.target.value)}
                     disabled={isFetching}
+                    style={{ height: '38.5px', boxSizing: 'border-box', marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
                   >
                     <option value="">{isFetching ? "Loading..." : "Select Item"}</option>
                     {rateCards.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
                   </select>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={collateral.specification || ""}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "specification", e.target.value)}
+                    placeholder="Item Description"
+                    style={{ fontSize: '13px', height: '38.5px', boxSizing: 'border-box', marginBottom: 0 }}
+                  />
                   <input
                     type="number"
                     min="1"
@@ -476,11 +488,16 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                     value={collateral.quantity || ""}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "quantity", parseInt(e.target.value) || 0)}
                     placeholder="0"
+                    style={{ height: '38.5px', boxSizing: 'border-box', marginBottom: 0 }}
                   />
                   <div
                     title="Auto-set from rate card"
                     style={{
-                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      height: '38.5px',
+                      padding: '0 12px',
                       background: 'var(--gray-50)',
                       border: '1px solid var(--gray-200)',
                       borderRadius: '10px',
@@ -488,39 +505,29 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                       fontWeight: 600,
                       color: collateral.unitPrice > 0 ? 'var(--gray-700)' : 'var(--gray-400)',
                       fontSize: '13px',
-                      textAlign: 'right',
                       cursor: 'default',
                       userSelect: 'none' as const,
+                      boxSizing: 'border-box',
                     }}
                   >
                     {collateral.unitPrice > 0 ? `₹${collateral.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                   </div>
-                  <div style={{ padding: '10px 12px', background: 'var(--gray-100)', borderRadius: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'right', color: 'var(--gray-800)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '38.5px', padding: '0 8px', background: 'var(--gray-100)', borderRadius: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gray-800)', fontSize: '13px', boxSizing: 'border-box', overflow: 'hidden' }}>
                     {formatCurrency(collateral.totalPrice)}
                   </div>
-                  {collaterals.length > 1 && (
+                  {collaterals.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => removeCollateral(collateral.id)}
-                      style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gray-400)', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                      style={{ width: '36px', height: '38.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gray-400)', borderRadius: '10px', border: 'none', background: 'transparent', cursor: 'pointer', boxSizing: 'border-box' }}
                       onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)' }}
                       onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--gray-400)'; e.currentTarget.style.background = 'transparent' }}
                     >
                       <TrashIcon />
                     </button>
+                  ) : (
+                    <div style={{ width: '36px' }}></div>
                   )}
-                </div>
-                {/* Item Specification/Description Input */}
-                <div style={{ marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={collateral.specification || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "specification", e.target.value)}
-                    placeholder="Enter item description/specification (optional)"
-                    style={{ fontSize: '13px', padding: '8px 12px', flex: 1 }}
-                  />
-                  <div style={{ width: '36px' }}></div>
                 </div>
               </div>
             ))}

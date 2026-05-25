@@ -899,12 +899,12 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                         marginBottom: '16px'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
                         <select
                           className="form-select"
                           value={selectedRateCardItem}
                           onChange={(e) => setSelectedRateCardItem(e.target.value)}
-                          style={{ flex: 2, marginBottom: 0, height: '38px' }}
+                          style={{ flex: 2, marginBottom: 0, height: '38.5px', boxSizing: 'border-box', paddingTop: 0, paddingBottom: 0 }}
                         >
                           <option value="">Select item...</option>
                           {rateCardItems.map((item) => (
@@ -912,13 +912,21 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                           ))}
                         </select>
                         <input
+                          type="text"
+                          className="form-input"
+                          value={newItemSpecification}
+                          onChange={(e) => setNewItemSpecification(e.target.value)}
+                          placeholder="Item Description"
+                          style={{ flex: 1.2, fontSize: '13px', padding: '8px 12px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box' }}
+                        />
+                        <input
                           type="number"
                           className="form-input"
                           value={newItemQuantity}
                           onChange={(e) => setNewItemQuantity(e.target.value)}
                           placeholder="Qty"
                           min="1"
-                          style={{ flex: 1, marginBottom: 0, height: '38px', maxWidth: '100px' }}
+                          style={{ flex: 1.5, marginBottom: 0, height: '38.5px', maxWidth: '140px', boxSizing: 'border-box' }}
                         />
                         <button
                           type="button"
@@ -933,7 +941,8 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                             color: (!selectedRateCardItem || !parseInt(newItemQuantity)) ? '#9ca3af' : 'white',
                             fontWeight: 600,
                             fontSize: '13px',
-                            height: '38px'
+                            height: '38.5px',
+                            boxSizing: 'border-box'
                           }}
                         >
                           Add
@@ -956,24 +965,15 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            height: '38px',
-                            width: '38px'
+                            height: '38.5px',
+                            width: '38px',
+                            boxSizing: 'border-box'
                           }}
                         >
                           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
-                      </div>
-                      <div style={{ width: '100%' }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={newItemSpecification}
-                          onChange={(e) => setNewItemSpecification(e.target.value)}
-                          placeholder="Enter item description/specification (optional)"
-                          style={{ fontSize: '13px', padding: '8px 12px', marginBottom: 0, width: '100%' }}
-                        />
                       </div>
                     </div>
                   )}
@@ -997,7 +997,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: 1.5 }}>
                               <div style={{ fontWeight: 600, color: 'var(--gray-900)' }}>{item.itemName}</div>
                               <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
                                 {item.quantity > 0 ? (
@@ -1007,6 +1007,18 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                                 )}
                               </div>
                             </div>
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={item.specification || ""}
+                              onChange={(e) => {
+                                const updated = [...collaterals]
+                                updated[index] = { ...item, specification: e.target.value }
+                                setCollaterals(updated)
+                              }}
+                              placeholder="Item Description"
+                              style={{ flex: 1.2, fontSize: '13px', padding: '8px 12px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box' }}
+                            />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <input
                                 type="number"
@@ -1034,7 +1046,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                                   }
                                 }}
                                 min="1"
-                                style={{ width: '80px', marginBottom: 0, textAlign: 'center' }}
+                                style={{ width: '120px', marginBottom: 0, textAlign: 'center', height: '38.5px', boxSizing: 'border-box' }}
                               />
                               <button
                                 type="button"
@@ -1048,7 +1060,10 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                                   color: '#dc2626',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'center'
+                                  justifyContent: 'center',
+                                  height: '38.5px',
+                                  width: '38px',
+                                  boxSizing: 'border-box'
                                 }}
                                 title="Remove item"
                               >
@@ -1057,21 +1072,6 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                                 </svg>
                               </button>
                             </div>
-                          </div>
-                          {/* Item Specification/Description Input */}
-                          <div style={{ width: '100%' }}>
-                            <input
-                              type="text"
-                              className="form-input"
-                              value={item.specification || ""}
-                              onChange={(e) => {
-                                const updated = [...collaterals]
-                                updated[index] = { ...item, specification: e.target.value }
-                                setCollaterals(updated)
-                              }}
-                              placeholder="Enter item description/specification (optional)"
-                              style={{ fontSize: '13px', padding: '8px 12px', marginBottom: 0, width: '100%' }}
-                            />
                           </div>
                         </div>
                       ))}
