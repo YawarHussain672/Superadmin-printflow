@@ -85,7 +85,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
         }
       })
       pocs.forEach((p) => {
-        if (p.location) {
+        if (p.role === "POC" && p.location) {
           const city = p.location.trim()
           if (city) {
             const existingCity = Object.keys(mergedLocations).find(

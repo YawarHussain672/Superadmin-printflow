@@ -216,7 +216,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
         if (project) {
           mergeItem(project.location, project.branch)
         }
-        teamData.forEach((p) => mergeItem(p.location, p.branch))
+        teamData.forEach((p) => {
+          if (p.role === "POC") {
+            mergeItem(p.location, p.branch)
+          }
+        })
 
         setBranchLocations(mergedLocations)
         setCities(Object.keys(mergedLocations).sort())
