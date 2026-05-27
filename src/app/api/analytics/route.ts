@@ -47,7 +47,6 @@ export async function GET() {
       }),
       prisma.project.groupBy({
         by: ["status"],
-        where: { approval: { status: "APPROVED" } },
         _count: { id: true },
         _sum: { totalCost: true },
       }),
