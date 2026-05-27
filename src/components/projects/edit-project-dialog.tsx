@@ -18,6 +18,7 @@ interface Project {
   deliveryDate: string | null
   status: string
   piNumber?: string | null
+  piStatus?: string | null
   material?: string
   quantity?: number
   packingCharges?: number | null
@@ -750,7 +751,15 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                     onChange={(e) => { setFormData({ ...formData, status: e.target.value }); setErrors({ ...errors, status: "" }) }}
                     style={errors.status ? { borderColor: '#ef4444' } : {}}
                   >
-                    {PROJECT_STATUSES.map((s) => (
+                    {PROJECT_STATUSES.filter((s) => {
+                      if (s.value === "printing") {
+                        const isCurrentlyPrintingOrLater = ["printing", "dispatched", "delivered"].includes(project?.status?.toLowerCase() || "");
+                        if (!isCurrentlyPrintingOrLater && project?.piStatus !== "VERIFIED") {
+                          return false;
+                        }
+                      }
+                      return true;
+                    }).map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>

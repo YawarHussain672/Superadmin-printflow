@@ -9,6 +9,7 @@ import { ProjectStatus } from "@prisma/client"
 interface UpdateStatusButtonProps {
   projectId: string
   currentStatus: ProjectStatus
+  piStatus?: string | null
 }
 
 const statusFlow: Record<ProjectStatus, ProjectStatus[]> = {
@@ -29,14 +30,17 @@ const statusLabels: Record<ProjectStatus, string> = {
   CANCELLED: "Cancelled",
 }
 
-export function UpdateStatusButton({ projectId, currentStatus }: UpdateStatusButtonProps) {
+export function UpdateStatusButton({ projectId, currentStatus, piStatus }: UpdateStatusButtonProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState<ProjectStatus | "">("")
   const [note, setNote] = useState("")
 
-  const availableStatuses = statusFlow[currentStatus] || []
+  let availableStatuses = statusFlow[currentStatus] || []
+  if (currentStatus === "APPROVED" && piStatus !== "VERIFIED") {
+    availableStatuses = availableStatuses.filter((status) => status !== "PRINTING")
+  }
 
   const handleUpdate = async () => {
     if (!selectedStatus) {

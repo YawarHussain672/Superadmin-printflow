@@ -286,76 +286,95 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (status !== undefined) {
       const newStatus = status as ProjectStatus
 
-      // Document requirements for status transitions
-      if (newStatus === "PRINTING" && existing.status === "APPROVED") {
-        // Check if PO is uploaded
-        const poExists = await prisma.fileUpload.findFirst({
-          where: { projectId: id, type: "PO" }
-        })
-        if (!poExists) {
-          return NextResponse.json({ error: "PO document required before moving to PRINTING status" }, { status: 400 })
-        }
+      // Only perform validation if status is actually changing
+      if (newStatus !== existing.status) {
+        // Document requirements for status transitions
+        if (newStatus === "PRINTING") {
+          if (existing.status !== "APPROVED") {
+            return NextResponse.json({ error: "Project must be APPROVED before moving to PRINTING status" }, { status: 400 })
+          }
 
-        // Send Production Started email to POC
-        if (existing.poc?.email) {
-          try {
-            await sendProductionStartedEmail(existing.poc.email, {
-              pocName: existing.poc.name,
-              projectName: existing.name,
-              piNumber: existing.piNumber || existing.projectId,
-              productionStartDate: new Date().toLocaleDateString('en-IN'),
-              appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-            })
-          } catch (emailError) {
-            console.error("[EMAIL ERROR] Failed to send production started email:", emailError)
+          if (existing.piStatus !== "VERIFIED") {
+            return NextResponse.json({ error: "Proforma Invoice (PI) must be verified by admin before moving to PRINTING status" }, { status: 400 })
+          }
+
+          // Check if PO is uploaded
+          const poExists = await prisma.fileUpload.findFirst({
+            where: { projectId: id, type: "PO" }
+          })
+          if (!poExists) {
+            return NextResponse.json({ error: "PO document required before moving to PRINTING status" }, { status: 400 })
+          }
+
+          // Send Production Started email to POC
+          if (existing.poc?.email) {
+            try {
+              await sendProductionStartedEmail(existing.poc.email, {
+                pocName: existing.poc.name,
+                projectName: existing.name,
+                piNumber: existing.piNumber || existing.projectId,
+                productionStartDate: new Date().toLocaleDateString('en-IN'),
+                appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+              })
+            } catch (emailError) {
+              console.error("[EMAIL ERROR] Failed to send production started email:", emailError)
+            }
           }
         }
-      }
 
-      if (newStatus === "DISPATCHED" && existing.status === "PRINTING") {
-        // Check if dispatch record exists
-        const dispatchExists = await prisma.dispatch.findFirst({
-          where: { projectId: id }
-        })
-        if (!dispatchExists) {
-          return NextResponse.json({ error: "Dispatch details required before moving to DISPATCHED status" }, { status: 400 })
-        }
+        if (newStatus === "DISPATCHED") {
+          if (existing.status !== "PRINTING") {
+            return NextResponse.json({ error: "Project must be in PRINTING status before moving to DISPATCHED status" }, { status: 400 })
+          }
 
-        // Send Shipment Dispatched email to POC
-        if (existing.poc?.email && dispatchExists) {
-          try {
-            await sendShipmentDispatchedEmail(existing.poc.email, {
-              pocName: existing.poc.name,
-              projectName: existing.name,
-              piNumber: existing.piNumber || existing.projectId,
-              dispatchDate: new Date().toLocaleDateString('en-IN'),
-              courier: (dispatchExists as any).courier || "Courier Partner",
-              deliveryAddress: existing.location || "Multiple / Address",
-              appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
-            })
-          } catch (emailError) {
-            console.error("[EMAIL ERROR] Failed to send shipment dispatched email:", emailError)
+          // Check if dispatch record exists
+          const dispatchExists = await prisma.dispatch.findFirst({
+            where: { projectId: id }
+          })
+          if (!dispatchExists) {
+            return NextResponse.json({ error: "Dispatch details required before moving to DISPATCHED status" }, { status: 400 })
+          }
+
+          // Send Shipment Dispatched email to POC
+          if (existing.poc?.email && dispatchExists) {
+            try {
+              await sendShipmentDispatchedEmail(existing.poc.email, {
+                pocName: existing.poc.name,
+                projectName: existing.name,
+                piNumber: existing.piNumber || existing.projectId,
+                dispatchDate: new Date().toLocaleDateString('en-IN'),
+                courier: (dispatchExists as any).courier || "Courier Partner",
+                deliveryAddress: existing.location || "Multiple / Address",
+                appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+              })
+            } catch (emailError) {
+              console.error("[EMAIL ERROR] Failed to send shipment dispatched email:", emailError)
+            }
           }
         }
-      }
 
-      if (newStatus === "DELIVERED" && existing.status === "DISPATCHED") {
-        const [challanExists, invoiceExists, dispatch] = await Promise.all([
-          prisma.fileUpload.findFirst({ where: { projectId: id, type: "CHALLAN" } }),
-          prisma.fileUpload.findFirst({ where: { projectId: id, type: "INVOICE" } }),
-          prisma.dispatch.findUnique({ where: { projectId: id }, select: { id: true, podUrl: true } }),
-        ])
+        if (newStatus === "DELIVERED") {
+          if (existing.status !== "DISPATCHED") {
+            return NextResponse.json({ error: "Project must be in DISPATCHED status before moving to DELIVERED status" }, { status: 400 })
+          }
 
-        if (!challanExists || !invoiceExists || !dispatch?.podUrl) {
-          return NextResponse.json({
-            error: "Challan, Invoice and POD are required before moving to DELIVERED status",
-          }, { status: 400 })
+          const [challanExists, invoiceExists, dispatch] = await Promise.all([
+            prisma.fileUpload.findFirst({ where: { projectId: id, type: "CHALLAN" } }),
+            prisma.fileUpload.findFirst({ where: { projectId: id, type: "INVOICE" } }),
+            prisma.dispatch.findUnique({ where: { projectId: id }, select: { id: true, podUrl: true } }),
+          ])
+
+          if (!challanExists || !invoiceExists || !dispatch?.podUrl) {
+            return NextResponse.json({
+              error: "Challan, Invoice and POD are required before moving to DELIVERED status",
+            }, { status: 400 })
+          }
+
+          await prisma.dispatch.update({
+            where: { id: dispatch.id },
+            data: { actualDelivery: new Date(), status: "delivered" },
+          })
         }
-
-        await prisma.dispatch.update({
-          where: { id: dispatch.id },
-          data: { actualDelivery: new Date(), status: "delivered" },
-        })
       }
 
       updateData.status = newStatus

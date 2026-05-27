@@ -316,7 +316,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                     <span style={{ pointerEvents: 'none' }}><EditIcon /></span> Edit Project
                   </button>
                 )}
-                {canUpdateStatus && <UpdateStatusButton projectId={project.id} currentStatus={project.status} />}
+                {canUpdateStatus && <UpdateStatusButton projectId={project.id} currentStatus={project.status} piStatus={project.piStatus} />}
                 {canDeleteProject && <DeleteProjectButton projectId={project.id} />}
               </>
             )}
