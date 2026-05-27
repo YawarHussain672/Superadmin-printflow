@@ -389,7 +389,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // Calculate total cost including items GST and packing charges with their GST
       const itemsGst = priced.totalGst
       const packingSubtotal = packingCharges || 0
-      const packingGst = packingSubtotal * ((packingChargesGstRate || 18) / 100)
+      const packingGst = packingSubtotal * ((packingChargesGstRate ?? 18) / 100)
 
       updateData.totalCost = priced.subtotal + packingSubtotal
       updateData.grandTotal = priced.subtotal + itemsGst + packingSubtotal + packingGst
@@ -399,7 +399,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const subtotal = existingCollaterals.reduce((sum, c) => sum + c.totalPrice, 0)
       const itemsGst = existingCollaterals.reduce((sum, c) => sum + c.gstAmount, 0)
       const packingSubtotal = packingCharges !== undefined ? packingCharges : (existing.packingCharges || 0)
-      const packingRate = packingChargesGstRate !== undefined ? packingChargesGstRate : (existing.packingChargesGstRate || 18)
+      const packingRate = packingChargesGstRate !== undefined ? packingChargesGstRate : (existing.packingChargesGstRate ?? 18)
       const packingGst = packingSubtotal * (packingRate / 100)
 
       updateData.totalCost = subtotal + packingSubtotal

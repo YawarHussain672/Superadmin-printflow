@@ -275,7 +275,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
 
         // Load packing charges from project
         const loadedPackingCharges = project.packingCharges || 0
-        const loadedPackingGstRate = project.packingChargesGstRate || 18
+        const loadedPackingGstRate = project.packingChargesGstRate ?? 18
         setPackingCharges(loadedPackingCharges)
         setPackingChargesGstRate(loadedPackingGstRate)
 
@@ -1113,8 +1113,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                       <input
                         type="number"
                         className="form-input"
-                        value={packingChargesGstRate || ''}
-                        onChange={(e) => setPackingChargesGstRate(parseFloat(e.target.value) || 18)}
+                        value={packingChargesGstRate ?? ''}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value)
+                          setPackingChargesGstRate(isNaN(val) ? 18 : val)
+                        }}
                         placeholder="GST %"
                         min="0"
                         max="100"

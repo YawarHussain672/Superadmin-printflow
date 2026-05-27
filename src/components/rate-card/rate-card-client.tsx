@@ -560,7 +560,7 @@ export function RateCardClient({ initialItems }: RateCardClientProps) {
               <input
                 type="number"
                 className="form-input"
-                value={editItem.gstRate || 18}
+                value={editItem.gstRate ?? 18}
                 onChange={(e) => setEditItem({ ...editItem, gstRate: parseFloat(e.target.value) || 0 })}
                 placeholder="e.g. 18"
                 min="0"

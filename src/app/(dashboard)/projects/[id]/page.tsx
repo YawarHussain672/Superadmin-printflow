@@ -447,7 +447,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <div className="item-row" style={{ background: 'rgba(59, 130, 246, 0.05)', marginTop: '8px', padding: '12px', borderRadius: '6px', border: '1px dashed var(--gray-300)' }}>
                     <div>
                       <strong>Packaging Charges</strong>
-                      <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '2px' }}>GST @ {project.packingChargesGstRate || 18}%</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '2px' }}>GST @ {project.packingChargesGstRate ?? 18}%</div>
                     </div>
                     <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                       {formatCurrency(project.packingCharges)}
@@ -498,15 +498,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 <div className="item-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-200)' }}>
                   <span style={{ color: 'var(--gray-600)' }}>GST on Items:</span>
                   <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                    {formatCurrency(project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate || 18) / 100)), 0))}
+                    {formatCurrency(project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate ?? 18) / 100)), 0))}
                   </span>
                 </div>
                 {/* GST on Packing (if any) */}
                 {project.packingCharges != null && project.packingCharges > 0 && (
                   <div className="item-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-200)' }}>
-                    <span style={{ color: 'var(--gray-600)' }}>GST on Packing ({project.packingChargesGstRate || 18}%):</span>
+                    <span style={{ color: 'var(--gray-600)' }}>GST on Packing ({project.packingChargesGstRate ?? 18}%):</span>
                     <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                      {formatCurrency((project.packingCharges || 0) * ((project.packingChargesGstRate || 18) / 100))}
+                      {formatCurrency((project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100))}
                     </span>
                   </div>
                 )}
@@ -515,8 +515,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <span style={{ color: 'var(--gray-700)', fontWeight: 600 }}>Total GST:</span>
                   <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                     {formatCurrency(
-                      project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate || 18) / 100)), 0) +
-                      ((project.packingCharges || 0) * ((project.packingChargesGstRate || 18) / 100))
+                      project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate ?? 18) / 100)), 0) +
+                      ((project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100))
                     )}
                   </span>
                 </div>
@@ -527,15 +527,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                     {formatCurrency(
                       project.collaterals.reduce((sum, c) => sum + c.totalPrice, 0) +
                       (project.packingCharges || 0) +
-                      project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate || 18) / 100)), 0) +
-                      ((project.packingCharges || 0) * ((project.packingChargesGstRate || 18) / 100))
+                      project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate ?? 18) / 100)), 0) +
+                      ((project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100))
                     )}
                   </strong>
                 </div>
               </div>
               <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(0, 168, 204, 0.1)', borderRadius: 'var(--radius-md)', borderLeft: '3px solid var(--axis-accent)' }}>
                 <p style={{ fontSize: '13px', color: 'var(--gray-600)', margin: 0 }}>
-                  💡 GST is applied per item at its rate. Packing @ {project.packingChargesGstRate || 18}%. Total shown is the final amount.
+                  💡 GST is applied per item at its rate. Packing @ {project.packingChargesGstRate ?? 18}%. Total shown is the final amount.
                 </p>
               </div>
             </div>

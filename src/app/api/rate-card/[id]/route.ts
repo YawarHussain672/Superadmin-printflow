@@ -14,9 +14,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const { itemName, subcategory, specification, volumeSlabs, gstRate, active } = await request.json()
 
+    const parsedGstRate = typeof gstRate === 'number' ? gstRate : parseFloat(gstRate)
+    const finalGstRate = isNaN(parsedGstRate) ? 18.0 : parsedGstRate
+
     const item = await prisma.rateCard.update({
       where: { id },
-      data: { itemName, subcategory: subcategory || null, specification, volumeSlabs, gstRate: parseFloat(gstRate) || 18.0, active },
+      data: { itemName, subcategory: subcategory || null, specification, volumeSlabs, gstRate: finalGstRate, active },
     })
     return NextResponse.json(item)
   } catch (error) {

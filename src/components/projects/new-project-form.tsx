@@ -210,7 +210,8 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
 
   // Packing charges with custom GST rate
   const packingCharges = parseFloat(formData.packingCharges) || 0
-  const packingChargesGstRate = parseFloat(formData.packingChargesGstRate) || 18
+  const parsedPackingChargesGstRate = parseFloat(formData.packingChargesGstRate)
+  const packingChargesGstRate = isNaN(parsedPackingChargesGstRate) ? 18 : parsedPackingChargesGstRate
   const packingChargesGst = packingCharges * (packingChargesGstRate / 100)
 
   // Total GST and final cost
@@ -597,7 +598,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                     />
                   </div>
                 </div>
-                <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>GST @ {formData.packingChargesGstRate || 18}% will be applied on packing charges</p>
+                 <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>GST @ {formData.packingChargesGstRate !== "" ? formData.packingChargesGstRate : 18}% will be applied on packing charges</p>
               </div>
             )}
           </div>
@@ -720,7 +721,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
             {packingCharges > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-600)' }}>
-                  Packing (₹{packingCharges} + {packingChargesGstRate || 18}% GST):
+                  Packing (₹{packingCharges} + {packingChargesGstRate}% GST):
                 </span>
                 <Currency amount={packingCharges + packingChargesGst} size="14px" color="#0ea5e9" />
               </div>
@@ -729,9 +730,9 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
               <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gray-900)' }}>Total Payable:</span>
               <span style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--axis-primary)' }}>{formatCurrency(totalCost)}</span>
             </div>
-            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '10px', textAlign: 'center' }}>
+             <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '10px', textAlign: 'center' }}>
               <p style={{ fontSize: '13px', color: '#1e40af', fontWeight: 500, margin: 0 }}>
-                💡 Product GST rates: {collaterals.filter(c => c.itemName).map(c => `${c.itemName} (${c.gstRate ?? 18}%)`).join(', ')}{packingCharges > 0 ? ` | Packing: ${packingChargesGstRate || 18}%` : ''}
+                💡 Product GST rates: {collaterals.filter(c => c.itemName).map(c => `${c.itemName} (${c.gstRate ?? 18}%)`).join(', ')}{packingCharges > 0 ? ` | Packing: ${packingChargesGstRate}%` : ''}
               </p>
             </div>
           </div>

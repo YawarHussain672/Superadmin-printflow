@@ -247,7 +247,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   let sNo = 1
 
   for (const item of project.collaterals) {
-    const gstRate = item.gstRate || 18
+    const gstRate = item.gstRate ?? 18
     const displayName = item.specification && item.specification.trim()
       ? `${item.itemName} (${item.specification.trim()})`
       : item.itemName

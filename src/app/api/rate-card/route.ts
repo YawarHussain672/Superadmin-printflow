@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "itemName and specification are required" }, { status: 400 })
     }
 
+    const parsedGstRate = typeof gstRate === 'number' ? gstRate : parseFloat(gstRate)
+    const finalGstRate = isNaN(parsedGstRate) ? 18.0 : parsedGstRate
+
     // Check for existing item with same name (including inactive/deleted)
     const existing = await prisma.rateCard.findFirst({
       where: { itemName: { equals: itemName, mode: "insensitive" } }
@@ -33,7 +36,7 @@ export async function POST(request: NextRequest) {
           subcategory: subcategory || null,
           specification,
           volumeSlabs: volumeSlabs || [],
-          gstRate: parseFloat(gstRate) || 18.0,
+          gstRate: finalGstRate,
           active: true
         }
       })
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // No existing item - create new
     const item = await prisma.rateCard.create({
-      data: { itemName, subcategory: subcategory || null, specification, volumeSlabs: volumeSlabs || [], gstRate: parseFloat(gstRate) || 18.0, active: true },
+      data: { itemName, subcategory: subcategory || null, specification, volumeSlabs: volumeSlabs || [], gstRate: finalGstRate, active: true },
     })
     return NextResponse.json(item, { status: 201 })
   } catch (error) {
