@@ -36,7 +36,7 @@ interface Project {
   client?: { id: string; name: string; role?: string }
   pocName?: string | null
   clientName?: string | null
-  collaterals?: { id?: string; itemName: string; quantity: number; unitPrice?: number; totalPrice?: number; gstRate?: number | null; gstAmount?: number | null }[]
+  collaterals?: { id?: string; itemName: string; quantity: number; unitPrice?: number; totalPrice?: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
   recipientName?: string | null
   recipientContact?: string | null
   recipientBranch?: string | null
@@ -516,6 +516,7 @@ export function ProjectsPageClient() {
               totalPrice: c.totalPrice || 0,
               gstRate: c.gstRate ?? 18,
               gstAmount: c.gstAmount ?? 0,
+              specification: c.specification || '',
             })),
             recipientName: editingProject.recipientName,
             recipientContact: editingProject.recipientContact,

@@ -22,7 +22,7 @@ interface Project {
   deliveryDate: string | null
   instructions: string | null
   status: string
-  collaterals: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number }[]
+  collaterals: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
   dispatch?: {
     courier: string
     trackingId: string
