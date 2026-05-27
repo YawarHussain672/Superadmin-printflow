@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { use, useEffect, useState, useCallback } from "react"
 import { redirect, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
@@ -14,6 +14,7 @@ import { PISection } from "@/components/projects/pi-section"
 import { TrackButton } from "@/components/dispatch/track-button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { toast } from "sonner"
+import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
 
 // SVG Icons matching HTML exactly
 const ArrowLeftIcon = () => (
@@ -120,7 +121,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
-  const fetchProject = async (): Promise<Project | null> => {
+  const fetchProject = useCallback(async (): Promise<Project | null> => {
     try {
       const res = await fetch(`/api/projects/${id}`)
       if (!res.ok) {
@@ -134,7 +135,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       setProject(null)
       return null
     }
-  }
+  }, [id, router])
 
   const refreshProject = async (): Promise<Project | null> => {
     setLoading(true)
@@ -160,6 +161,25 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       refreshProject()
     }
   }, [id, router, status])
+
+  // Real-time updates subscription via Pusher
+  useEffect(() => {
+    const client = getPusherClient()
+    const channel = client.subscribe(CHANNELS.PROJECTS)
+
+    const handleUpdated = (data?: { id?: string; projectId?: string }) => {
+      if (!data || (!data.id && !data.projectId) || data.id === id || data.projectId === id) {
+        void fetchProject()
+      }
+    }
+
+    channel.bind(EVENTS.PROJECT_UPDATED, handleUpdated)
+
+    return () => {
+      channel.unbind(EVENTS.PROJECT_UPDATED, handleUpdated)
+      client.unsubscribe(CHANNELS.PROJECTS)
+    }
+  }, [id, fetchProject])
 
   // Guard calculations until project is loaded
   const getStatusHistory = (status: ProjectStatus) =>
