@@ -118,14 +118,41 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
     { id: "1", itemName: "", quantity: 0, unitPrice: 0, totalPrice: 0, gstRate: 18, specification: "" },
   ])
 
-  // Auto-set POC if user is a POC
+  // Auto-set POC and their location/branch if user is a POC
   const isPoc = session?.user?.role === "POC"
   useEffect(() => {
     if (isPoc && session?.user?.id) {
-      console.log("Session detected POC:", session.user.id)
-      setFormData((prev) => ({ ...prev, pocId: session.user.id }))
+      setFormData((prev) => {
+        const updated = { ...prev, pocId: session.user.id }
+        if (pocs.length > 0 && !prev.city) {
+          const selectedPoc = pocs.find(p => p.id === session.user.id)
+          if (selectedPoc) {
+            let matchedCity = prev.city
+            let matchedBranch = prev.branch
+
+            if (selectedPoc.location) {
+              const cleanedLoc = selectedPoc.location.trim()
+              const foundCity = Object.keys(branchLocations).find(
+                c => c.toLowerCase() === cleanedLoc.toLowerCase()
+              )
+              matchedCity = foundCity || cleanedLoc
+            }
+            if (selectedPoc.branch) {
+              const cleanedBranch = selectedPoc.branch.trim()
+              const branches = branchLocations[matchedCity]?.branches || []
+              const foundBranch = branches.find(
+                b => b.toLowerCase() === cleanedBranch.toLowerCase()
+              )
+              matchedBranch = foundBranch || cleanedBranch
+            }
+            updated.city = matchedCity
+            updated.branch = matchedBranch
+          }
+        }
+        return updated
+      })
     }
-  }, [isPoc, session?.user?.id])
+  }, [isPoc, session?.user?.id, pocs, branchLocations])
 
   const today = new Date().toISOString().split("T")[0]
 

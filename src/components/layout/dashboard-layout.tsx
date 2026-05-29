@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Sidebar } from "./sidebar"
 import { TopBar } from "./top-bar"
 import { NewProjectModal } from "@/components/projects/new-project-modal"
@@ -10,11 +11,13 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, user }: DashboardLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
   return (
-    <div className="app-shell">
-      <Sidebar user={user} />
+    <div className={`app-shell ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+      <Sidebar user={user} isOpen={sidebarOpen} />
       <main className="main-content">
-        <TopBar user={user} />
+        <TopBar user={user} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
         <div className="content-wrapper">
           {children}
         </div>
@@ -23,3 +26,4 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
     </div>
   )
 }
+

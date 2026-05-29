@@ -383,7 +383,7 @@ export function ProjectsPageClient() {
                       <td className="font-mono">
                         {(() => {
                           // Compute grand total from collateral gstAmounts when grandTotal is 0 (legacy projects)
-                          const collateralGst = project.collaterals?.reduce((s, c) => s + (c.gstAmount ?? (c.totalPrice || 0) * ((c.gstRate ?? 18) / 100)), 0) ?? 0
+                          const collateralGst = project.collaterals?.reduce((s, c) => s + (c.gstAmount || (c.totalPrice || 0) * ((c.gstRate ?? 18) / 100)), 0) ?? 0
                           const packingGst = (project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100)
                           const computedGrandTotal = project.totalCost + collateralGst + packingGst
                           const displayGrandTotal = project.grandTotal && project.grandTotal > project.totalCost
@@ -508,16 +508,20 @@ export function ProjectsPageClient() {
             quantity: editingProject.collaterals?.[0]?.quantity || 0,
             packingCharges: editingProject.packingCharges,
             packingChargesGstRate: editingProject.packingChargesGstRate,
-            collaterals: editingProject.collaterals?.map((c, i) => ({
-              id: c.id || String(i),
-              itemName: c.itemName,
-              quantity: c.quantity,
-              unitPrice: c.unitPrice || 0,
-              totalPrice: c.totalPrice || 0,
-              gstRate: c.gstRate ?? 18,
-              gstAmount: c.gstAmount ?? 0,
-              specification: c.specification || '',
-            })),
+            collaterals: editingProject.collaterals?.map((c, i) => {
+              const totalPrice = c.totalPrice || 0
+              const gstRate = c.gstRate ?? 18
+              return {
+                id: c.id || String(i),
+                itemName: c.itemName,
+                quantity: c.quantity,
+                unitPrice: c.unitPrice || 0,
+                totalPrice,
+                gstRate,
+                gstAmount: c.gstAmount || totalPrice * (gstRate / 100),
+                specification: c.specification || '',
+              }
+            }),
             recipientName: editingProject.recipientName,
             recipientContact: editingProject.recipientContact,
             recipientBranch: editingProject.recipientBranch,

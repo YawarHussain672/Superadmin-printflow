@@ -60,7 +60,7 @@ async function getDashboardStats(projectFilter: Prisma.ProjectWhereInput) {
     totalSpend,
     recentProjects,
   ] = await Promise.all([
-    prisma.project.count({ where: projectFilter }),
+    prisma.project.count({ where: { ...projectFilter, status: { not: ProjectStatus.CANCELLED } } }),
     prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.REQUESTED } }),
     prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.PRINTING } }),
     prisma.project.count({ where: { ...projectFilter, status: ProjectStatus.DISPATCHED } }),

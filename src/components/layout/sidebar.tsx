@@ -8,6 +8,7 @@ import { openNewProjectModal } from "@/components/projects/new-project-modal"
 
 interface SidebarProps {
   user?: { name: string; email: string; role: string }
+  isOpen?: boolean
 }
 
 // SVG Icons matching HTML file exactly
@@ -71,7 +72,7 @@ const LogoutIcon = () => (
   </svg>
 )
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, isOpen = true }: SidebarProps) {
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [counts, setCounts] = useState({ totalProjects: 0, pendingApprovals: 0 })
@@ -233,6 +234,19 @@ export function Sidebar({ user }: SidebarProps) {
             </button>
           </div>
         )}
+        <div style={{
+          marginTop: '6px',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px'
+        }}>
+          <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.4)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            Powered by
+          </span>
+          <img src="/rm-white-logo3.svg" alt="Logo" style={{ height: '24px', opacity: 0.8, objectFit: 'contain', filter: 'brightness(0) invert(1)', position: 'relative', top: '1px' }} />
+        </div>
       </div>
     </aside>
   )

@@ -24,7 +24,10 @@ export async function GET() {
       branchData,
     ] = await Promise.all([
       prisma.project.count({
-        where: { approval: { status: "APPROVED" } }
+        where: {
+          approval: { status: "APPROVED" },
+          status: { not: ProjectStatus.CANCELLED }
+        }
       }),
       prisma.project.count({
         where: {

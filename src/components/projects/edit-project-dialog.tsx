@@ -268,7 +268,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
               unitPrice: c.unitPrice || 0,
               totalPrice,
               gstRate,
-              gstAmount: c.gstAmount ?? totalPrice * (gstRate / 100),
+              gstAmount: c.gstAmount || totalPrice * (gstRate / 100),
               specification: c.specification || "",
             }
           }) || []
@@ -457,7 +457,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
 
   const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
   const itemGstAmount = collaterals.reduce(
-    (sum, c) => sum + (c.gstAmount ?? (c.totalPrice * ((c.gstRate ?? 18) / 100))),
+    (sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))),
     0
   )
   const packingGstAmount = packingCharges * (packingChargesGstRate / 100)

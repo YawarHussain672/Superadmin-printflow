@@ -268,7 +268,7 @@ export function PISection({
         {/* Row 1: Generate / View / Download Buttons */}
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
           {/* Generate PI Button - Compact */}
-          {(!piNumber || !piPdfUrl || piStatus === "REJECTED") && isAuthorized && (
+          {(!piNumber || !piPdfUrl || piStatus === "REJECTED") && isAuthorized && userRole !== "CLIENT" && (
             <button
               onClick={handleGeneratePI}
               disabled={isGenerating}
@@ -316,7 +316,7 @@ export function PISection({
           )}
 
           {/* View & Download Buttons Group */}
-          {piPdfUrl && piStatus !== "REJECTED" && (
+          {piPdfUrl && piStatus !== "REJECTED" && (userRole !== "CLIENT" || piStatus === "VERIFIED") && (
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 onClick={handleViewPI}
@@ -386,6 +386,31 @@ export function PISection({
             </div>
           )}
         </div>
+
+        {/* Client Status message when not verified */}
+        {userRole === "CLIENT" && (!piStatus || piStatus !== "VERIFIED") && (
+          <div style={{
+            padding: "12px 16px",
+            background: "rgba(241, 245, 249, 0.5)",
+            borderRadius: "6px",
+            border: "1px solid var(--gray-200)",
+            color: "var(--gray-600)",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginTop: "4px"
+          }}>
+            <FileSearch size={16} color="var(--gray-400)" />
+            <span>
+              {!piStatus 
+                ? "No Proforma Invoice has been generated for this project yet." 
+                : piStatus === "PENDING"
+                ? "Proforma Invoice has been generated and is pending admin verification."
+                : "Proforma Invoice has been rejected."}
+            </span>
+          </div>
+        )}
 
         {/* Row 2: Admin Verification Buttons */}
         {isAdmin && piStatus === "PENDING" && piPdfUrl && (
