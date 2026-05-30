@@ -95,7 +95,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === DETAILS SECTION ===
   const detailsY = 24
-  const boxHeight = 42
+  const boxHeight = 35
   const colWidth = (pageWidth - 20) / 2
 
   // Customer Box (Left)
@@ -105,19 +105,19 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   doc.setFont("times", "normal")
   doc.setFontSize(9)
-  let custY = detailsY + 13
+  let custY = detailsY + 12
   doc.setFont("times", "bold")
   doc.text("Axis Max Life Insurance Ltd.", 12, custY)
   doc.setFont("times", "normal")
-  custY += 4.5
+  custY += 4.0
   doc.text("3rd Floor, Operations Centre,", 12, custY)
-  custY += 4.5
+  custY += 4.0
   doc.text("90-A, Udyog Vihar, Sector 18,", 12, custY)
-  custY += 4.5
+  custY += 4.0
   doc.text("Gurugram-122015, Haryana, INDIA", 12, custY)
-  custY += 4.5
+  custY += 4.0
   doc.text("PAN/IT NO:AACCM3201E", 12, custY)
-  custY += 4.5
+  custY += 4.0
   doc.text("GST No.06AACCM3201E1Z7", 12, custY)
 
   // Proforma Details Box (Right)
@@ -131,25 +131,25 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   const labelX = rightBoxX + 2
   const valueX = rightBoxX + 35
 
-  doc.text("No.", labelX, detailsY + 13)
-  doc.text(project.piNumber, valueX, detailsY + 13)
+  doc.text("No.", labelX, detailsY + 12)
+  doc.text(project.piNumber, valueX, detailsY + 12)
 
-  doc.text("Date:-", labelX, detailsY + 18)
-  doc.text(project.generatedAt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }), valueX, detailsY + 18)
+  doc.text("Date:-", labelX, detailsY + 16)
+  doc.text(project.generatedAt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }), valueX, detailsY + 16)
 
-  doc.text("Revise Date", labelX, detailsY + 23)
+  doc.text("Revise Date", labelX, detailsY + 20)
 
-  doc.text("Job Name :-", labelX, detailsY + 28)
+  doc.text("Job Name :-", labelX, detailsY + 24)
   doc.setFont("times", "bold")
-  doc.text(project.name, valueX, detailsY + 28)
+  doc.text(project.name, valueX, detailsY + 24)
   // Underline for Job Name
   const jobNameWidth = doc.getTextWidth(project.name)
   doc.setLineWidth(0.1)
-  doc.line(valueX, detailsY + 29, valueX + jobNameWidth, detailsY + 29)
+  doc.line(valueX, detailsY + 25, valueX + jobNameWidth, detailsY + 25)
 
   doc.setFont("times", "normal")
-  doc.text("Contact Person:-", labelX, detailsY + 33)
-  doc.text(project.pocName || "", valueX, detailsY + 33)
+  doc.text("Contact Person:-", labelX, detailsY + 29)
+  doc.text(project.pocName || "", valueX, detailsY + 29)
 
   // Draw Boxes for Details
   doc.setLineWidth(0.1)
