@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import path from "path"
 
 const FROM = process.env.MAIL_FROM_ADDRESS
   ? `${process.env.MAIL_FROM_NAME || "Printflow"} <${process.env.MAIL_FROM_ADDRESS}>`
@@ -42,7 +43,20 @@ async function sendMail(to: string, subject: string, html: string) {
   try {
     // Verify SMTP connection before sending (helps surface auth errors immediately)
     await transporter.verify()
-    const result = await transporter.sendMail({ from: FROM, to, subject, html })
+    const bannerPath = path.join(process.cwd(), "RM signature Banner (1).jpg")
+    const result = await transporter.sendMail({
+      from: FROM,
+      to,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: "banner.jpg",
+          path: bannerPath,
+          cid: "rm-signature-banner"
+        }
+      ]
+    })
     console.log(`[EMAIL SENT] to=${to} subject="${subject}" messageId=${result.messageId}`)
     return result
   } catch (error: unknown) {
@@ -64,14 +78,17 @@ function baseTemplate(title: string, body: string) {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
         <tr><td style="background:#003c71;padding:24px 32px">
-          <h1 style="margin:0;color:#fff;font-size:20px;font-weight:700">Axis Max Life</h1>
+          <h1 style="margin:0;color:#fff;font-size:20px;font-weight:700">Rishiraj Media</h1>
           <p style="margin:4px 0 0;color:#93c5fd;font-size:13px">Print Management System</p>
         </td></tr>
-        <tr><td style="padding:32px">
+        <tr><td style="padding:32px 32px 16px">
           <h2 style="margin:0 0 16px;color:#0f172a;font-size:18px">${title}</h2>
           ${body}
-          <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0">
-          <p style="margin:0;color:#94a3b8;font-size:12px">This is an automated message from Axis Max Life Print Management System. Please do not reply to this email.</p>
+        </td></tr>
+        <tr><td style="padding:0">
+          <a href="https://rishirajmedia.com/" target="_blank" style="display:block;text-decoration:none;border:none;">
+            <img src="cid:rm-signature-banner" alt="Rishiraj Media" style="width:100%;max-width:600px;height:auto;display:block;border:none;" />
+          </a>
         </td></tr>
       </table>
     </td></tr>
