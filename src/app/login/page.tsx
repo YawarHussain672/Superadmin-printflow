@@ -137,9 +137,14 @@ export default function LoginPage() {
               justifyContent: 'center',
               border: '1px solid rgba(255,255,255,0.2)',
               boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-              backgroundColor: 'rgba(255,255,255,0.1)'
+              backgroundColor: 'white',
+              overflow: 'hidden'
             }}>
-              <span style={{ color: 'white', fontWeight: 700, fontSize: '1.25rem' }}>A</span>
+              <img 
+                src="https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA" 
+                alt="Axis Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
             <div>
               <p style={{ color: 'white', fontWeight: 600, fontSize: '1.125rem' }}>Axis Max Life</p>
@@ -210,9 +215,14 @@ export default function LoginPage() {
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-              background: 'linear-gradient(135deg, #00264c, #003c71)'
+              backgroundColor: 'white',
+              overflow: 'hidden'
             }}>
-              <span style={{ color: 'white', fontWeight: 700, fontSize: '1.125rem' }}>A</span>
+              <img 
+                src="https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA" 
+                alt="Axis Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
             <div>
               <p style={{ fontWeight: 600, fontSize: '1.125rem', color: '#1a1b20' }}>Axis Max Life</p>
