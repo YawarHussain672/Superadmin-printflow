@@ -117,7 +117,12 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
       {/* Header */}
       <div className="sidebar-header">
         <div className="logo">
-          <div className="logo-icon">A</div>
+          <img 
+            src="https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA" 
+            alt="Logo" 
+            className="logo-icon" 
+            style={{ objectFit: 'cover', borderRadius: 'var(--radius-sm)', background: 'transparent' }}
+          />
           <div className="logo-text">
             <h1>Axis Max Life</h1>
             <p>Print Management</p>
@@ -234,19 +239,27 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
             </button>
           </div>
         )}
-        <div style={{
-          marginTop: '6px',
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }}>
+        <a 
+          href="https://www.rishirajmedia.com/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{
+            marginTop: '6px',
+            display: 'inline-flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            textDecoration: 'none',
+            cursor: 'pointer',
+            width: '100%'
+          }}
+        >
           <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.4)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, whiteSpace: 'nowrap' }}>
             Powered by
           </span>
           <img src="/rm-white-logo3.svg" alt="Logo" style={{ height: '24px', opacity: 0.8, objectFit: 'contain', filter: 'brightness(0) invert(1)', position: 'relative', top: '1px' }} />
-        </div>
+        </a>
       </div>
     </aside>
   )

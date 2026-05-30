@@ -100,15 +100,16 @@ async function getDashboardStats(projectFilter: Prisma.ProjectWhereInput) {
   }
 }
 
-function StatCard({ label, value, icon, iconBg, iconColor }: {
+function StatCard({ label, value, icon, iconBg, iconColor, className = "" }: {
   label: string
   value: string | number
   icon: React.ReactNode
   iconBg: string
   iconColor: string
+  className?: string
 }) {
   return (
-    <div className="stat-card">
+    <div className={`stat-card ${className}`}>
       <div className="stat-header">
         <div>
           <div className="stat-label">{label}</div>
@@ -199,6 +200,7 @@ export default async function DashboardPage() {
           icon={<RupeeIcon />}
           iconBg="rgba(16, 185, 129, 0.1)"
           iconColor="var(--color-success)"
+          className="spend-card"
         />
       </div>
 

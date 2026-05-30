@@ -451,6 +451,11 @@ body {
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+  min-width: 240px;
+}
+
+.stat-card.spend-card {
+  min-width: max-content;
 }
 
 .stat-card::before {
@@ -479,6 +484,7 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 16px;
+  gap: 16px;
 }
 
 .stat-label {
@@ -504,6 +510,7 @@ body {
   font-weight: 800;
   color: var(--gray-900);
   margin-bottom: 8px;
+  white-space: nowrap;
 }
 
 /* Cards */

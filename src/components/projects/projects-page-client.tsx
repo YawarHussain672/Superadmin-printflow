@@ -86,6 +86,50 @@ const ChevronRightIcon = () => (
 const PROJECT_CREATED_EVENT = "project-created"
 const PROJECT_DELETED_EVENT = "project-deleted"
 
+function MaterialCell({ materials }: { materials: string[] }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  if (!materials || materials.length === 0) return <span>—</span>
+  const text = materials.join(", ")
+  const isLong = text.length > 50
+  
+  if (!isLong) {
+    return <span>{text}</span>
+  }
+  
+  return (
+    <div style={{ maxWidth: '200px' }}>
+      <div style={isExpanded ? {} : {
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}>
+        {text}
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsExpanded(!isExpanded)
+        }}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'var(--axis-accent)',
+          fontSize: '11px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          padding: 0,
+          marginTop: '4px',
+          display: 'block'
+        }}
+      >
+        {isExpanded ? "view less" : "view more"}
+      </button>
+    </div>
+  )
+}
+
 export function ProjectsPageClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -374,7 +418,9 @@ export function ProjectsPageClient() {
                       </td>
                       <td>{project.location}{project.state ? `, ${project.state}` : ''}</td>
                       <td>{project.branch || "—"}</td>
-                      <td>{project.collaterals?.map((c) => c.itemName).join(", ") || "—"}</td>
+                      <td>
+                        <MaterialCell materials={project.collaterals?.map((c) => c.itemName) || []} />
+                      </td>
                       <td className="font-mono">
                         {project.collaterals?.reduce((s, c) => s + c.quantity, 0).toLocaleString("en-IN")}
                       </td>

@@ -95,7 +95,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === DETAILS SECTION ===
   const detailsY = 24
-  const boxHeight = 40
+  const boxHeight = 42
   const colWidth = (pageWidth - 20) / 2
 
   // Customer Box (Left)
@@ -106,25 +106,19 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFont("times", "normal")
   doc.setFontSize(9)
   let custY = detailsY + 13
-  if (project.clientName) {
-    doc.text(project.clientName, 12, custY)
-    custY += 4.5
-    if (project.clientLocation) {
-      doc.text(project.clientLocation, 12, custY)
-      custY += 4.5
-    }
-  } else {
-    doc.text(project.pocName || "N/A", 12, custY)
-    custY += 4.5
-    const locStr = `${project.location || ""}${project.state ? `, ${project.state}` : ""}`
-    if (locStr) {
-      doc.text(locStr, 12, custY)
-      custY += 4.5
-    }
-  }
-  doc.text(`PAN/IT No : ${project.clientPan || ""}`, 12, custY)
+  doc.setFont("times", "bold")
+  doc.text("Axis Max Life Insurance Ltd.", 12, custY)
+  doc.setFont("times", "normal")
   custY += 4.5
-  doc.text(`GST No. : ${project.clientGst || ""}`, 12, custY)
+  doc.text("3rd Floor, Operations Centre,", 12, custY)
+  custY += 4.5
+  doc.text("90-A, Udyog Vihar, Sector 18,", 12, custY)
+  custY += 4.5
+  doc.text("Gurugram-122015, Haryana, INDIA", 12, custY)
+  custY += 4.5
+  doc.text("PAN/IT NO:AACCM3201E", 12, custY)
+  custY += 4.5
+  doc.text("GST No.06AACCM3201E1Z7", 12, custY)
 
   // Proforma Details Box (Right)
   const rightBoxX = 10 + colWidth
