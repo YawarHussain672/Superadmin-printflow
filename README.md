@@ -51,8 +51,8 @@ A high-performance print project management system built for Axis. Manages the c
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/YawarHussain672/axis-management.git
-cd axis-management
+git clone https://github.com/YawarHussain672/SuperAdmin-Printflow.git
+cd SuperAdmin-Printflow
 npm install
 ```
 
@@ -94,7 +94,7 @@ Visit `http://localhost:3000` to start.
 ## 📁 Project Structure
 
 ```bash
-axis-management/
+SuperAdmin-Printflow/
 ├── prisma/             # Schema & Seeding
 ├── public/             # Static Assets & Templates
 ├── src/
@@ -126,20 +126,6 @@ axis-management/
 
 Ensure your Excel file follows this structure for bulk dispatch uploads:
 
-| Project ID | Courier | Tracking ID | Dispatch Date |
-|---|---|---|---|
-| `PRJ-2026-001` | `Blue Dart` | `AWB12345` | `2026-05-06` |
-
-*Note: Column headers are case-insensitive. Template available in the Dispatch module.*
-
----
-
-## 📄 License
-
-MIT — Copyright (c) 2026 Axis Print Management Team.rmat (Dispatch)
-
-Download the template from the Dispatch page or use this column structure:
-
 | Column | Required | Example |
 |---|---|---|
 | Project ID | ✅ | `PRJ-2026-100` |
@@ -150,10 +136,10 @@ Download the template from the Dispatch page or use this column structure:
 | Expected Delivery | ⬜ | `2026-04-20` |
 | Notes | ⬜ | `Handle with care` |
 
-Column names are case-insensitive. Supports `.xlsx`, `.xls`, and `.csv`.
+*Note: Column headers are case-insensitive. Template available in the Dispatch module. Supports `.xlsx`, `.xls`, and `.csv`.*
 
 ---
 
-## License
+## 📄 License
 
-MIT — free to use and modify.
+MIT — Copyright (c) 2026 Axis Print Management Team. Free to use and modify.
