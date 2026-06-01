@@ -6,7 +6,10 @@ declare module "next-auth" {
       id: string
       name: string
       email: string
-      role: UserRole
+      role: UserRole | "SUPERADMIN"
+      clientId?: string | null
+      companyName?: string
+      companyLogoUrl?: string
     }
   }
 
@@ -14,7 +17,10 @@ declare module "next-auth" {
     id: string
     name: string
     email: string
-    role: UserRole
+    role: UserRole | "SUPERADMIN"
+    clientId?: string | null
+    companyName?: string
+    companyLogoUrl?: string
   }
 }
 
@@ -23,6 +29,9 @@ declare module "next-auth/jwt" {
     id: string
     name: string
     email: string
-    role: UserRole
+    role: UserRole | "SUPERADMIN"
+    clientId?: string | null
+    companyName?: string
+    companyLogoUrl?: string
   }
 }

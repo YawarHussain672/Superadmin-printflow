@@ -137,17 +137,18 @@ export default function LoginPage() {
               justifyContent: 'center',
               border: '1px solid rgba(255,255,255,0.2)',
               boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-              backgroundColor: 'white',
-              overflow: 'hidden'
+              backgroundColor: '#002a52',
+              overflow: 'hidden',
+              padding: '6px'
             }}>
               <img 
-                src="https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA" 
-                alt="Axis Logo"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                src="/rm-white-logo3.svg" 
+                alt="Rishiraj Media Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
               />
             </div>
             <div>
-              <p style={{ color: 'white', fontWeight: 600, fontSize: '1.125rem' }}>Axis Max Life</p>
+              <p style={{ color: 'white', fontWeight: 600, fontSize: '1.125rem' }}>Rishiraj Media</p>
               <p style={{ color: '#b5ebff', fontSize: '0.875rem', fontWeight: 500, letterSpacing: '0.05em' }}>PRINT MANAGEMENT</p>
             </div>
           </div>
@@ -215,17 +216,18 @@ export default function LoginPage() {
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-              backgroundColor: 'white',
-              overflow: 'hidden'
+              backgroundColor: '#002a52',
+              overflow: 'hidden',
+              padding: '6px'
             }}>
               <img 
-                src="https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA" 
-                alt="Axis Logo"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                src="/rm-white-logo3.svg" 
+                alt="Rishiraj Media Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
               />
             </div>
             <div>
-              <p style={{ fontWeight: 600, fontSize: '1.125rem', color: '#1a1b20' }}>Axis Max Life</p>
+              <p style={{ fontWeight: 600, fontSize: '1.125rem', color: '#1a1b20' }}>Rishiraj Media</p>
               <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#003c71' }}>PRINT MANAGEMENT</p>
             </div>
           </div>
@@ -370,14 +372,14 @@ export default function LoginPage() {
           {/* Contact Admin */}
           <p style={{ marginTop: '2rem', textAlign: 'center', color: '#42474f' }}>
             Don&apos;t have an account?{" "}
-            <a href="mailto:admin@axismaxlife.com" style={{ fontWeight: 600, color: '#003c71', textDecoration: 'none' }}>
+            <a href="mailto:info@rishirajmedia.in" style={{ fontWeight: 600, color: '#003c71', textDecoration: 'none' }}>
               Contact administrator
             </a>
           </p>
 
           {/* Footer */}
           <div style={{ marginTop: '3rem', paddingTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem', color: '#737780' }}>
-            © 2024 Axis Max Life Insurance
+            © 2024 Rishiraj Media
           </div>
         </div>
       </div>

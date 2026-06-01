@@ -118,13 +118,13 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
       <div className="sidebar-header">
         <div className="logo">
           <img 
-            src="https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA" 
+            src={(user as any)?.companyLogoUrl || "https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA"} 
             alt="Logo" 
             className="logo-icon" 
             style={{ objectFit: 'cover', borderRadius: 'var(--radius-sm)', background: 'transparent' }}
           />
           <div className="logo-text">
-            <h1>Axis Max Life</h1>
+            <h1>{(user as any)?.companyName || "Axis Max Life"}</h1>
             <p>Print Management</p>
           </div>
         </div>

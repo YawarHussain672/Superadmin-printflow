@@ -1,6 +1,7 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import sharp from "sharp"
+import { basePrisma } from "./prisma"
 
 interface CollateralItem {
   itemName: string
@@ -34,6 +35,7 @@ interface ProjectData {
   recipientBranch?: string | null
   collaterals: CollateralItem[]
   generatedAt: Date
+  clientId?: string | null
 }
 
 export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
@@ -45,42 +47,99 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   // Default font for the whole document to match Times New Roman in HTML
   doc.setFont("times", "normal")
 
+  // === FETCH CLIENT DETAILS ===
+  let logoUrl = ""
+  let companyName = "Axis Max Life Insurance Ltd."
+  let companyLocation = "Gurugram"
+  let companyState = "Haryana"
+  let clientPan = "AACCM3201E"
+  let clientGst = "06AACCM3201E1Z7"
+  let branchLocation = "3rd Floor, Operations Centre, 90-A, Udyog Vihar, Sector 18"
+
+  if (project.clientId) {
+    try {
+      const client = await basePrisma.client.findUnique({
+        where: { id: project.clientId }
+      })
+      if (client) {
+        logoUrl = client.companyLogoUrl || ""
+        companyName = client.companyName
+        companyLocation = client.location
+        companyState = client.state
+        branchLocation = client.branchLocation || ""
+
+        // Fetch Pan and GST from Client Admin
+        const adminUser = await basePrisma.user.findFirst({
+          where: { clientId: client.id, role: "ADMIN" }
+        })
+        if (adminUser) {
+          clientPan = adminUser.clientPan || ""
+          clientGst = adminUser.clientGst || ""
+        }
+      }
+    } catch (dbErr) {
+      console.error("Error fetching client details for PDF:", dbErr)
+    }
+  }
+
   // === HEADER SECTION ===
 
-  // Add logo in top left (purple color) - smaller size
-  try {
-    const fs = await import('fs')
-    const path = await import('path')
-    const svgPath = path.join(process.cwd(), 'rm-white-logo3.svg')
-    const pngPath = path.join(process.cwd(), 'rm-white-logo3.png')
-
-    // Delete cached PNG if it exists to ensure we use the updated purple SVG
-    if (fs.existsSync(pngPath)) {
-      fs.unlinkSync(pngPath)
+  let logoLoaded = false
+  if (logoUrl) {
+    try {
+      const res = await fetch(logoUrl)
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        const pngBuffer = await sharp(buffer)
+          .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
+          .png()
+          .toBuffer()
+        doc.addImage(pngBuffer, 'PNG', 10, 3.9, 30, 15)
+        logoLoaded = true
+      }
+    } catch (logoErr) {
+      console.error("Error loading remote logo URL, falling back:", logoErr)
     }
+  }
 
-    // Convert SVG to PNG with proper background handling
-    if (fs.existsSync(svgPath)) {
-      await sharp(svgPath)
-        .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
-        .recomb([
-          [0.5, 0, 0.5],
-          [0, 0, 0],
-          [0.5, 0, 0.5]
-        ])
-        .png()
-        .toFile(pngPath)
+  if (!logoLoaded) {
+    try {
+      const fs = await import('fs')
+      const path = await import('path')
+      const svgPath = path.join(process.cwd(), 'rm-white-logo3.svg')
+      const pngPath = path.join(process.cwd(), 'rm-white-logo3.png')
 
-      const logoData = fs.readFileSync(pngPath)
-      const base64Image = logoData.toString('base64')
-      doc.addImage(base64Image, 'PNG', 10, 3.9, 30, 15)
+      if (fs.existsSync(pngPath)) {
+        fs.unlinkSync(pngPath)
+      }
+
+      if (fs.existsSync(svgPath)) {
+        await sharp(svgPath)
+          .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
+          .recomb([
+            [0.5, 0, 0.5],
+            [0, 0, 0],
+            [0.5, 0, 0.5]
+          ])
+          .png()
+          .toFile(pngPath)
+
+        const logoData = fs.readFileSync(pngPath)
+        const base64Image = logoData.toString('base64')
+        doc.addImage(base64Image, 'PNG', 10, 3.9, 30, 15)
+        logoLoaded = true
+      }
+    } catch (error) {
+      // If default logo processing fails, use text fallback
     }
-  } catch (error) {
-    // If logo processing fails, use purple text fallback
+  }
+
+  if (!logoLoaded) {
     doc.setFontSize(10)
     doc.setTextColor(128, 0, 128)
     doc.setFont("times", "bold")
-    doc.text("RISHIRAJ MEDIA", 12, 15)
+    doc.text(companyName.toUpperCase(), 12, 15)
     doc.setTextColor(0, 0, 0)
   }
 
@@ -107,18 +166,26 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.setFontSize(9)
   let custY = detailsY + 12
   doc.setFont("times", "bold")
-  doc.text("Axis Max Life Insurance Ltd.", 12, custY)
+  doc.text(companyName, 12, custY)
   doc.setFont("times", "normal")
+
+  const branchLines = doc.splitTextToSize(branchLocation, colWidth - 4)
+  for (const line of branchLines) {
+    custY += 4.0
+    doc.text(line, 12, custY)
+  }
+
   custY += 4.0
-  doc.text("3rd Floor, Operations Centre,", 12, custY)
-  custY += 4.0
-  doc.text("90-A, Udyog Vihar, Sector 18,", 12, custY)
-  custY += 4.0
-  doc.text("Gurugram-122015, Haryana, INDIA", 12, custY)
-  custY += 4.0
-  doc.text("PAN/IT NO:AACCM3201E", 12, custY)
-  custY += 4.0
-  doc.text("GST No.06AACCM3201E1Z7", 12, custY)
+  doc.text(`${companyLocation}-${companyState}, INDIA`, 12, custY)
+  
+  if (clientPan) {
+    custY += 4.0
+    doc.text(`PAN/IT NO:${clientPan}`, 12, custY)
+  }
+  if (clientGst) {
+    custY += 4.0
+    doc.text(`GST No.${clientGst}`, 12, custY)
+  }
 
   // Proforma Details Box (Right)
   const rightBoxX = 10 + colWidth

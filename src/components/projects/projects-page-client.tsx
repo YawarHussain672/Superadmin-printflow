@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react"
 import { openNewProjectModal } from "@/components/projects/new-project-modal"
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { MaterialCell } from "@/components/ui/material-cell"
 import { toast } from "sonner"
 import { CITIES } from "@/lib/branch-locations"
 import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
@@ -86,49 +87,6 @@ const ChevronRightIcon = () => (
 const PROJECT_CREATED_EVENT = "project-created"
 const PROJECT_DELETED_EVENT = "project-deleted"
 
-function MaterialCell({ materials }: { materials: string[] }) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  if (!materials || materials.length === 0) return <span>—</span>
-  const text = materials.join(", ")
-  const isLong = text.length > 50
-  
-  if (!isLong) {
-    return <span>{text}</span>
-  }
-  
-  return (
-    <div style={{ maxWidth: '200px' }}>
-      <div style={isExpanded ? {} : {
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}>
-        {text}
-      </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setIsExpanded(!isExpanded)
-        }}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: 'var(--axis-accent)',
-          fontSize: '11px',
-          fontWeight: 700,
-          cursor: 'pointer',
-          padding: 0,
-          marginTop: '4px',
-          display: 'block'
-        }}
-      >
-        {isExpanded ? "view less" : "view more"}
-      </button>
-    </div>
-  )
-}
 
 export function ProjectsPageClient() {
   const router = useRouter()
@@ -264,16 +222,17 @@ export function ProjectsPageClient() {
   }
 
   return (
-    <div>
+    <div style={{ display: 'inline-block', minWidth: 'max-content', width: '100%', verticalAlign: 'top' }}>
       {/* Page Header */}
       <div className="page-header">
         <h1 className="page-title">All Projects</h1>
         <p className="page-subtitle">Complete project list with advanced filtering</p>
       </div>
 
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ minWidth: '980px', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Filters */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ padding: '20px', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           {!isPoc && (
             <select
               className="form-select"
@@ -321,8 +280,8 @@ export function ProjectsPageClient() {
         </div>
       </div>
 
-      {/* Projects Table */}
-      <div className="card">
+        {/* Projects Table */}
+        <div className="card" style={{ margin: 0 }}>
         {isLoading ? (
           <div style={{ padding: '60px', textAlign: 'center', color: 'var(--gray-500)' }}>
             <div className="animate-spin" style={{ width: '32px', height: '32px', border: '2px solid var(--axis-primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 16px' }} />
@@ -330,7 +289,7 @@ export function ProjectsPageClient() {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
+            <div>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -354,12 +313,14 @@ export function ProjectsPageClient() {
                         {project.projectId}
                       </td>
                       <td onClick={() => router.push(`/projects/${project.id}`)} style={{ cursor: 'pointer' }}>
-                        <strong>{project.name}</strong>
+                        <div style={{ maxWidth: '130px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                          <strong>{project.name}</strong>
+                        </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxWidth: '130px' }}>
                           {/* Line 1: POC */}
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                             {project.poc?.name || project.pocName || "—"}
                             <span style={{
                               fontSize: '10px',
@@ -371,7 +332,8 @@ export function ProjectsPageClient() {
                               border: '1px solid rgba(217, 119, 6, 0.2)',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '3px'
+                              gap: '3px',
+                              flexShrink: 0
                             }}>
                               <span style={{
                                 width: '4px',
@@ -390,7 +352,7 @@ export function ProjectsPageClient() {
                           )}
                           {/* Line 3: Client */}
                           {(project.client || project.clientName) && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                               {project.client?.name || project.clientName}
                               <span style={{
                                 fontSize: '10px',
@@ -402,7 +364,8 @@ export function ProjectsPageClient() {
                                 border: '1px solid rgba(2, 132, 199, 0.2)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '3px'
+                                gap: '3px',
+                                flexShrink: 0
                               }}>
                                 <span style={{
                                   width: '4px',
@@ -416,8 +379,16 @@ export function ProjectsPageClient() {
                           )}
                         </div>
                       </td>
-                      <td>{project.location}{project.state ? `, ${project.state}` : ''}</td>
-                      <td>{project.branch || "—"}</td>
+                      <td>
+                        <div style={{ maxWidth: '100px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                          {project.location}{project.state ? `, ${project.state}` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: '80px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                          {project.branch || "—"}
+                        </div>
+                      </td>
                       <td>
                         <MaterialCell materials={project.collaterals?.map((c) => c.itemName) || []} />
                       </td>
@@ -439,7 +410,7 @@ export function ProjectsPageClient() {
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <span style={{ fontWeight: 600 }}>₹{displayGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
+                              <span style={{ fontSize: '10px', color: 'var(--gray-500)', display: 'block', maxWidth: '100px', whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: '1.2', marginTop: '2px' }}>
                                 (Base: ₹{project.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + GST: ₹{gstPart.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                               </span>
                             </div>
@@ -535,6 +506,7 @@ export function ProjectsPageClient() {
             )}
           </>
         )}
+      </div>
       </div>
 
       {/* Edit Project Dialog */}

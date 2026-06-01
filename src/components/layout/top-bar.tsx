@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { toast } from "sonner"
 import { useDebouncedCallback } from "use-debounce"
+import { useSession } from "next-auth/react"
 import { openNewProjectModal } from "@/components/projects/new-project-modal"
 import { NotificationBell } from "./notification-bell"
 
 interface TopBarProps {
-  user?: { role: string }
+  user?: { role: string; companyName?: string }
   onToggleSidebar?: () => void
 }
 
@@ -51,13 +52,16 @@ const LoaderIcon = () => (
 
 export function TopBar({ user, onToggleSidebar }: TopBarProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const { data: session } = useSession()
+  const currentUser = user || session?.user
   const [exporting, setExporting] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<{ id: string; projectId: string; name: string; status: string; location: string }[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [searching, setSearching] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
-  const isAdmin = user?.role === "ADMIN"
+  const isAdmin = currentUser?.role === "ADMIN"
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -118,7 +122,8 @@ export function TopBar({ user, onToggleSidebar }: TopBarProps) {
       // Left: Company name and system name
       doc.setFontSize(13)
       doc.setFont("helvetica", "bold")
-      doc.text("AXIS MAX LIFE", 14, 11)
+      const exportCompanyName = (currentUser as any)?.companyName || "AXIS MAX LIFE"
+      doc.text(exportCompanyName.toUpperCase(), 14, 11)
       doc.setFontSize(8)
       doc.setFont("helvetica", "normal")
       doc.text("Print Project Management System", 14, 16)
@@ -179,6 +184,8 @@ export function TopBar({ user, onToggleSidebar }: TopBarProps) {
     }
   }
 
+  const isSuperAdmin = currentUser?.role === "SUPERADMIN"
+
   return (
     <header className="top-bar">
       <button 
@@ -190,77 +197,78 @@ export function TopBar({ user, onToggleSidebar }: TopBarProps) {
         <HamburgerIcon />
       </button>
 
-      {/* Search */}
-      <div className="search-bar" ref={searchRef}>
+      {/* Search - Hidden for SuperAdmins */}
+      {!isSuperAdmin && (
+        <div className="search-bar" ref={searchRef}>
+          <SearchIcon />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search projects, locations, tracking IDs..."
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); doSearch(e.target.value) }}
+            onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+          />
+          {searching && (
+            <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }}>
+              <LoaderIcon />
+            </div>
+          )}
 
-        <SearchIcon />
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Search projects, locations, tracking IDs..."
-          value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); doSearch(e.target.value) }}
-          onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
-        />
-        {searching && (
-          <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }}>
-            <LoaderIcon />
-          </div>
-        )}
+          {/* Dropdown results */}
+          {searchOpen && searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: 0,
+              right: 0,
+              background: 'white',
+              border: '1px solid var(--gray-200)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-lg)',
+              zIndex: 50,
+              overflow: 'hidden'
+            }}>
+              {searchResults.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => { router.push(`/projects/${p.id}`); setSearchOpen(false); setSearchQuery("") }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--gray-100)',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-50)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                >
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-900)' }}>{p.name}</p>
+                    <p className="font-mono" style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{p.projectId} · {p.location}</p>
+                  </div>
+                  <span className={statusBadgeClass(p.status)}>
+                    <span className="status-dot"></span>
+                    {p.status}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Dropdown results */}
-        {searchOpen && searchResults.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            left: 0,
-            right: 0,
-            background: 'white',
-            border: '1px solid var(--gray-200)',
-            borderRadius: 'var(--radius-md)',
-            boxShadow: 'var(--shadow-lg)',
-            zIndex: 50,
-            overflow: 'hidden'
-          }}>
-            {searchResults.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => { router.push(`/projects/${p.id}`); setSearchOpen(false); setSearchQuery("") }}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '12px 16px',
-                  borderBottom: '1px solid var(--gray-100)',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gray-50)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-              >
-                <div>
-                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-900)' }}>{p.name}</p>
-                  <p className="font-mono" style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{p.projectId} · {p.location}</p>
-                </div>
-                <span className={statusBadgeClass(p.status)}>
-                  <span className="status-dot"></span>
-                  {p.status}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="top-actions">
-        {/* Notification Button - All roles */}
+      <div className="top-actions" style={{ marginLeft: isSuperAdmin ? "auto" : undefined }}>
+        {/* Notification Bell - All roles */}
         <NotificationBell />
 
-        {/* Export Button - Admin and POC only */}
-        {user?.role !== "CLIENT" && (
+        {/* Export Button - Admin and POC only, hidden for SuperAdmins */}
+        {currentUser?.role !== "CLIENT" && !isSuperAdmin && (
           <button className="btn btn-secondary" onClick={handleExport} disabled={exporting}>
             {exporting ? <LoaderIcon /> : <ExportIcon />}
             Export
@@ -268,10 +276,22 @@ export function TopBar({ user, onToggleSidebar }: TopBarProps) {
         )}
 
         {/* New Project Button - Admin and POC only */}
-        {user?.role !== "CLIENT" && (
+        {currentUser?.role !== "CLIENT" && !isSuperAdmin && (
           <button className="btn btn-primary" onClick={openNewProjectModal}>
             <PlusIcon />
             New Project
+          </button>
+        )}
+
+        {/* Create Admin Button - SuperAdmin only */}
+        {isSuperAdmin && (
+          <button
+            className="btn btn-primary"
+            onClick={() => window.dispatchEvent(new CustomEvent("openCreateAdmin"))}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <PlusIcon />
+            Create Admin
           </button>
         )}
       </div>

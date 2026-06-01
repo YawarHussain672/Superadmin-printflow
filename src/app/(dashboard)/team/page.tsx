@@ -101,7 +101,7 @@ export default function TeamPage() {
   }
 
   return (
-    <div>
+    <div style={{ display: 'inline-block', minWidth: 'max-content', width: '100%', verticalAlign: 'top' }}>
       {/* Page Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -112,8 +112,8 @@ export default function TeamPage() {
       </div>
 
       {/* Team Table Card */}
-      <div className="card">
-        <div style={{ overflowX: 'auto' }}>
+      <div className="card" style={{ minWidth: '1000px', width: '100%' }}>
+        <div>
           <table className="data-table">
             <thead>
               <tr>
@@ -132,7 +132,7 @@ export default function TeamPage() {
               {members.map((member: TeamMember) => (
                 <tr key={member.id}>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '220px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                       <div
                         className="user-avatar"
                         style={{
@@ -145,18 +145,25 @@ export default function TeamPage() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontWeight: 700,
-                          color: 'white'
+                          color: 'white',
+                          flexShrink: 0
                         }}
                       >
                         {getInitials(member.name)}
                       </div>
-                      <strong>{member.name}</strong>
+                      <strong style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{member.name}</strong>
                     </div>
                   </td>
-                  <td>{member.email}</td>
+                  <td>
+                    <div style={{ maxWidth: '200px', whiteSpace: 'normal', wordBreak: 'break-all' }}>{member.email}</div>
+                  </td>
                   <td className="font-mono">{member.phone || "—"}</td>
-                  <td>{member.location || "—"}</td>
-                  <td>{member.branch || "—"}</td>
+                  <td>
+                    <div style={{ maxWidth: '150px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{member.location || "—"}</div>
+                  </td>
+                  <td>
+                    <div style={{ maxWidth: '150px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{member.branch || "—"}</div>
+                  </td>
                   <td>
                     <span
                       style={{

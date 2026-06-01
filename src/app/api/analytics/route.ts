@@ -1,13 +1,34 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { ProjectStatus } from "@prisma/client"
+import { ProjectStatus, Prisma } from "@prisma/client"
+import { withTenantScope } from "@/lib/tenant-scope"
 
-export async function GET() {
+async function handler(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session || session.user.role !== "ADMIN") {
+  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "SUPERADMIN")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const filterClientId = searchParams.get("clientId")
+
+  // SuperAdmins can drill-down to a specific client, otherwise they see global data.
+  // Normal admins are locked to their own clientId.
+  const targetClientId = session.user.role === "SUPERADMIN"
+    ? filterClientId
+    : session.user.clientId
+
+  const isFilterApplied = !!targetClientId
+
+  // Build prisma filters for builder queries
+  const projectWhere: Prisma.ProjectWhereInput = {}
+  const collateralWhere: Prisma.CollateralWhereInput = {}
+
+  if (targetClientId) {
+    projectWhere.tenantClientId = targetClientId
+    collateralWhere.project = { tenantClientId: targetClientId }
   }
 
   try {
@@ -25,18 +46,21 @@ export async function GET() {
     ] = await Promise.all([
       prisma.project.count({
         where: {
+          ...projectWhere,
           approval: { status: "APPROVED" },
           status: { not: ProjectStatus.CANCELLED }
         }
       }),
       prisma.project.count({
         where: {
+          ...projectWhere,
           status: ProjectStatus.DELIVERED,
           approval: { status: "APPROVED" }
         }
       }),
       prisma.project.count({
         where: {
+          ...projectWhere,
           status: { not: ProjectStatus.DELIVERED },
           approval: { status: "APPROVED" }
         }
@@ -44,25 +68,35 @@ export async function GET() {
       prisma.project.aggregate({
         _sum: { totalCost: true },
         where: {
+          ...projectWhere,
           approval: { status: "APPROVED" },
           status: { not: ProjectStatus.CANCELLED }
         }
       }),
       prisma.project.groupBy({
         by: ["status"],
+        where: projectWhere,
         _count: { id: true },
         _sum: { totalCost: true },
       }),
       prisma.project.groupBy({
         by: ["location"],
-        where: { approval: { status: "APPROVED" } },
+        where: {
+          ...projectWhere,
+          approval: { status: "APPROVED" }
+        },
         _count: { id: true },
         _sum: { totalCost: true },
         orderBy: { _sum: { totalCost: "desc" } },
       }),
       prisma.collateral.groupBy({
         by: ["itemName"],
-        where: { project: { approval: { status: "APPROVED" } } },
+        where: {
+          project: {
+            ...projectWhere,
+            approval: { status: "APPROVED" }
+          }
+        },
         _count: { id: true },
         _sum: { totalPrice: true, quantity: true },
         orderBy: { _sum: { totalPrice: "desc" } },
@@ -75,7 +109,8 @@ export async function GET() {
           COALESCE(SUM(CASE WHEN p.status != 'CANCELLED' THEN p."totalCost" ELSE 0 END), 0) as spend
         FROM projects p
         INNER JOIN approvals a ON a."projectId" = p.id
-        WHERE a.status = 'APPROVED'
+        WHERE a.status = 'APPROVED' 
+          AND (${isFilterApplied} = false OR p."tenantClientId" = ${targetClientId})
         GROUP BY TO_CHAR(p."createdAt", 'Mon YYYY'), DATE_TRUNC('month', p."createdAt")
         ORDER BY DATE_TRUNC('month', p."createdAt") DESC
         LIMIT 12
@@ -86,7 +121,9 @@ export async function GET() {
           COALESCE(SUM(p."leadsConverted"), 0) as total_converted
         FROM projects p
         INNER JOIN approvals a ON a."projectId" = p.id
-        WHERE p."leadsGenerated" IS NOT NULL AND a.status = 'APPROVED'
+        WHERE p."leadsGenerated" IS NOT NULL 
+          AND a.status = 'APPROVED'
+          AND (${isFilterApplied} = false OR p."tenantClientId" = ${targetClientId})
       `,
       // Branch-wise marketing data - only show branches with real project data
       prisma.$queryRaw<Array<{
@@ -104,7 +141,9 @@ export async function GET() {
           COALESCE(SUM(CASE WHEN p.status != 'CANCELLED' THEN p."totalCost" ELSE 0 END), 0) as marketing_spend
         FROM projects p
         INNER JOIN approvals a ON a."projectId" = p.id
-        WHERE p.branch IS NOT NULL AND p.branch != '' AND a.status = 'APPROVED'
+        WHERE p.branch IS NOT NULL AND p.branch != '' 
+          AND a.status = 'APPROVED'
+          AND (${isFilterApplied} = false OR p."tenantClientId" = ${targetClientId})
         GROUP BY p.branch
         ORDER BY COALESCE(SUM(CASE WHEN p.status != 'CANCELLED' THEN p."totalCost" ELSE 0 END), 0) DESC
       `,
@@ -152,3 +191,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch analytics", details: message }, { status: 500 })
   }
 }
+
+export const GET = withTenantScope(handler)

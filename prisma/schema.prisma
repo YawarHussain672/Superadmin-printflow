@@ -7,6 +7,43 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Client {
+  id              String          @id @default(cuid())
+  companyName     String
+  companyLogoUrl  String?
+  clientEmail     String          @unique
+  passwordHash    String
+  location        String
+  branchLocation  String?
+  state           String
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  createdBy       String          // SuperAdmin id
+
+  // Relations
+  users           User[]          @relation("ClientUsers")
+  projects        Project[]       @relation("ClientProjects")
+  rateCards       RateCard[]      @relation("ClientRateCards")
+  approvals       Approval[]      @relation("ClientApprovals")
+  dispatches      Dispatch[]      @relation("ClientDispatches")
+  notifications   Notification[]  @relation("ClientNotifications")
+  activities      Activity[]      @relation("ClientActivities")
+  statusHistories StatusHistory[] @relation("ClientStatusHistories")
+
+  @@map("clients")
+}
+
+model SuperAdmin {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("SUPERADMIN")
+  createdAt    DateTime @default(now())
+
+  @@map("super_admins")
+}
+
 model User {
   id                 String          @id @default(cuid())
   email              String          @unique
@@ -29,6 +66,10 @@ model User {
   approvalsRequested Approval[]      @relation("approvalRequestedBy")
   approvalsMade      Approval[]      @relation("approvalApprovedBy")
   notifications      Notification[]
+
+  // Multi-tenancy
+  clientId           String?
+  client             Client?         @relation("ClientUsers", fields: [clientId], references: [id], onDelete: SetNull)
 
   @@map("users")
 }
@@ -57,7 +98,7 @@ model Project {
   updatedAt             DateTime        @updatedAt
   pocId                 String?
   pocName               String?
-  clientId              String?
+  clientId              String? // Stores original CLIENT user id if created on behalf of client
   clientName            String?
   branch                String?
   recipientName         String?
@@ -72,6 +113,10 @@ model Project {
   poc                   User?           @relation("ProjectPoc", fields: [pocId], references: [id], onDelete: SetNull)
   client                User?           @relation("ProjectClient", fields: [clientId], references: [id], onDelete: SetNull)
   statusHistory         StatusHistory[]
+
+  // Multi-tenancy (Tenant record scope)
+  tenantClientId        String?
+  tenantClient          Client?         @relation("ClientProjects", fields: [tenantClientId], references: [id], onDelete: SetNull)
 
   @@map("projects")
 }
@@ -100,6 +145,10 @@ model StatusHistory {
   changedById String?
   project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   changedBy   User?         @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  // Multi-tenancy
+  clientId    String?
+  client      Client?       @relation("ClientStatusHistories", fields: [clientId], references: [id], onDelete: SetNull)
 
   @@map("status_history")
 }
@@ -135,6 +184,10 @@ model Approval {
   requestedBy   User           @relation("approvalRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
   approvedBy    User?          @relation("approvalApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
+  // Multi-tenancy
+  clientId      String?
+  client        Client?        @relation("ClientApprovals", fields: [clientId], references: [id], onDelete: SetNull)
+
   @@map("approvals")
 }
 
@@ -155,6 +208,10 @@ model Dispatch {
   updatedAt        DateTime  @updatedAt
   project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  // Multi-tenancy
+  clientId         String?
+  client           Client?   @relation("ClientDispatches", fields: [clientId], references: [id], onDelete: SetNull)
+
   @@map("dispatches")
 }
 
@@ -169,6 +226,10 @@ model RateCard {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Multi-tenancy
+  clientId      String?
+  client        Client?  @relation("ClientRateCards", fields: [clientId], references: [id], onDelete: SetNull)
+
   @@map("rate_cards")
 }
 
@@ -181,6 +242,10 @@ model Activity {
   details    Json?
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Multi-tenancy
+  clientId   String?
+  client     Client?  @relation("ClientActivities", fields: [clientId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([createdAt])
@@ -197,6 +262,10 @@ model Notification {
   link      String?
   createdAt DateTime @default(now())
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Multi-tenancy
+  clientId  String?
+  client    Client?  @relation("ClientNotifications", fields: [clientId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([createdAt])

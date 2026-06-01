@@ -103,6 +103,7 @@ export async function POST(
       recipientBranch: project.recipientBranch,
       collaterals: project.collaterals,
       generatedAt: generatedAt,
+      clientId: project.tenantClientId,
     })
 
     // Upload to S3

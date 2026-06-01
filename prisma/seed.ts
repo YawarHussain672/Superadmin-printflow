@@ -16,10 +16,39 @@ async function main() {
   await prisma.project.deleteMany()
   await prisma.rateCard.deleteMany()
   await prisma.user.deleteMany()
+  await prisma.client.deleteMany()
+  await prisma.superAdmin.deleteMany()
 
   console.log("Cleared existing data")
 
-  // Create admin user
+  // Create SuperAdmin
+  const superAdminPassword = await bcrypt.hash("Superadmin@123", 10)
+  const superAdmin = await prisma.superAdmin.create({
+    data: {
+      email: "superadmin@rishirajmedia.com",
+      name: "Rishiraj Media SuperAdmin",
+      passwordHash: superAdminPassword,
+    }
+  })
+  console.log("SuperAdmin created:", superAdmin.email)
+
+  // Create default Client
+  const clientPasswordHash = await bcrypt.hash("Admin@123", 10)
+  const defaultClient = await prisma.client.create({
+    data: {
+      companyName: "Axis Max Life",
+      clientEmail: "admin@axismaxlife.com",
+      passwordHash: clientPasswordHash,
+      location: "Gurugram",
+      branchLocation: "3rd Floor, Operations Centre, 90-A, Udyog Vihar, Sector 18, Gurugram, Haryana - 122015, India",
+      state: "Haryana",
+      createdBy: superAdmin.id,
+      companyLogoUrl: "https://play-lh.googleusercontent.com/Vn9VseeV197UW8_kkGzMJY0dsORX93S2wY3j_YHeotP_GaRZ-9rf9BSeCbSjNy83fzA",
+    }
+  })
+  console.log("Client created:", defaultClient.companyName)
+
+  // Create admin user (linked to client)
   const adminPassword = await bcrypt.hash("Admin@123", 10)
   const admin = await prisma.user.create({
     data: {
@@ -28,9 +57,12 @@ async function main() {
       password: adminPassword,
       role: UserRole.ADMIN,
       phone: "+91 98765 43210",
-      location: "Mumbai",
-      branch: "Head Office",
+      location: "Gurugram",
+      branch: "3rd Floor, Operations Centre, 90-A, Udyog Vihar, Sector 18, Gurugram, Haryana - 122015, India",
       active: true,
+      clientId: defaultClient.id,
+      clientPan: "AACCM3201E",
+      clientGst: "06AACCM3201E1Z7",
     },
   })
   console.log("Admin created:", admin.email)
@@ -60,6 +92,7 @@ async function main() {
         location: poc.location,
         branch: poc.branch,
         active: true,
+        clientId: defaultClient.id,
       },
     })
     pocs.push(createdPoc)
@@ -76,7 +109,12 @@ async function main() {
   ]
 
   for (const item of rateCardData) {
-    await prisma.rateCard.create({ data: item })
+    await prisma.rateCard.create({
+      data: {
+        ...item,
+        clientId: defaultClient.id,
+      }
+    })
   }
   console.log("Rate cards created")
 
@@ -701,11 +739,16 @@ async function main() {
         packingCharges: proj.packingCharges,
         pocId: pocs[proj.pocIndex].id,
         createdAt: proj.createdAt,
+        tenantClientId: defaultClient.id,
         collaterals: {
           create: proj.collaterals,
         },
         statusHistory: {
-          create: proj.statusHistory,
+          create: proj.statusHistory.map((sh: any) => ({
+            status: sh.status,
+            note: sh.note,
+            clientId: defaultClient.id,
+          })),
         },
       },
     })
@@ -736,6 +779,7 @@ async function main() {
           dispatchDate: proj.dispatch.dispatchDate,
           expectedDelivery: proj.dispatch.expectedDelivery,
           actualDelivery: proj.dispatch.actualDelivery,
+          clientId: defaultClient.id,
         },
       })
     }
@@ -777,6 +821,7 @@ async function main() {
         status: appStatus,
         reminderCount: 0,
         approvedAt: appStatus === ApprovalStatus.APPROVED ? new Date() : null,
+        clientId: defaultClient.id,
       },
     })
 

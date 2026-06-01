@@ -490,6 +490,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             recipientBranch: freshProject.recipientBranch,
             collaterals: freshProject.collaterals,
             generatedAt: generatedAt,
+            clientId: freshProject.tenantClientId,
           })
 
           const s3Path = `projects/${id}/pi/${freshProject.piNumber}.pdf`

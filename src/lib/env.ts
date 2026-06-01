@@ -12,6 +12,8 @@ const required = [
   "AWS_DEFAULT_REGION",
   "AWS_BUCKET",
   "AWS_URL",
+  "SUPERADMIN_EMAIL",
+  "SUPERADMIN_PASSWORD",
 ] as const
 
 export function validateEnv() {

@@ -46,7 +46,7 @@ export default async function DispatchPage() {
   const dispatches = await getDispatchData(session.user.id, session.user.role)
 
   return (
-    <div className="content-wrapper">
+    <div style={{ display: 'inline-block', minWidth: 'max-content', width: '100%', verticalAlign: 'top' }}>
       {/* Page Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
@@ -61,49 +61,61 @@ export default async function DispatchPage() {
       </div>
 
       {/* Dispatch Table Card */}
-      <div className="card" style={{ overflowX: 'auto' }}>
-        <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+      <div className="card" style={{ minWidth: '1000px', width: '100%' }}>
+        <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ background: 'var(--gray-50)' }}>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Project ID</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Project Name</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Location</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Courier</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Tracking ID</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Dispatch Date</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Expected Delivery</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Status</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Project Details</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>POD</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, fontSize: '12px', color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '2px solid var(--gray-200)' }}>Actions</th>
+            <tr>
+              <th>Project ID</th>
+              <th>Project Name</th>
+              <th>Location</th>
+              <th>Courier</th>
+              <th>Tracking ID</th>
+              <th>Dispatch Date</th>
+              <th>Expected Delivery</th>
+              <th>Status</th>
+              <th>Project Details</th>
+              <th>POD</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {dispatches.map((dispatch) => (
-              <tr key={dispatch.id} style={{ borderBottom: '1px solid var(--gray-200)', transition: 'background 0.2s' }}>
-                <td style={{ padding: '14px 16px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--axis-primary)' }}>
+              <tr key={dispatch.id}>
+                <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--axis-primary)' }}>
                   <Link href={`/projects/${dispatch.project.id}`} style={{ color: 'var(--axis-primary)', textDecoration: 'none' }}>
                     {dispatch.project.projectId}
                   </Link>
                 </td>
-                <td style={{ padding: '14px 16px', fontWeight: 600 }}>{dispatch.project.name}</td>
-                <td style={{ padding: '14px 16px', color: 'var(--gray-600)' }}>{dispatch.project.location}</td>
-                <td style={{ padding: '14px 16px', color: 'var(--gray-600)' }}>{dispatch.courier}</td>
-                <td style={{ padding: '14px 16px', fontFamily: 'var(--font-mono)', color: 'var(--axis-accent)', fontWeight: 600 }}>
+                <td style={{ fontWeight: 600 }}>
+                  <div style={{ maxWidth: '180px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    {dispatch.project.name}
+                  </div>
+                </td>
+                <td>
+                  <div style={{ maxWidth: '120px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    {dispatch.project.location}
+                  </div>
+                </td>
+                <td>
+                  <div style={{ maxWidth: '100px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    {dispatch.courier}
+                  </div>
+                </td>
+                <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--axis-accent)', fontWeight: 600 }}>
                   {getTrackingId(dispatch) || '-'}
                 </td>
-                <td style={{ padding: '14px 16px', color: 'var(--gray-600)' }}>
+                <td>
                   {dispatch.dispatchDate ? formatDate(dispatch.dispatchDate) : '-'}
                 </td>
-                <td style={{ padding: '14px 16px', color: 'var(--gray-600)' }}>
+                <td>
                   {dispatch.expectedDelivery ? formatDate(dispatch.expectedDelivery) : '-'}
                 </td>
-                <td style={{ padding: '14px 16px' }}>
+                <td>
                   <span className={`status-badge status-${dispatch.project.status.toLowerCase()}`}>
                     {dispatch.project.status}
                   </span>
                 </td>
-                <td style={{ padding: '14px 16px' }}>
+                <td>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <a
                       href={`/api/dispatch/${dispatch.id}/details-excel`}
@@ -113,10 +125,10 @@ export default async function DispatchPage() {
                     </a>
                   </div>
                 </td>
-                <td style={{ padding: '14px 16px' }}>
+                <td>
                   <PodUploadButton dispatchId={dispatch.id} podUrl={dispatch.podUrl} />
                 </td>
-                <td style={{ padding: '14px 16px' }}>
+                <td style={{ textAlign: "right" }}>
                   {dispatch.courier && getTrackingId(dispatch) ? (
                     <TrackButton
                       courier={dispatch.courier}
