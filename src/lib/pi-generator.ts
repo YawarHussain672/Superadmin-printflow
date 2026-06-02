@@ -85,54 +85,34 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   // === HEADER SECTION ===
 
   let logoLoaded = false
-  if (logoUrl) {
-    try {
-      const res = await fetch(logoUrl)
-      if (res.ok) {
-        const arrayBuffer = await res.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-        const pngBuffer = await sharp(buffer)
-          .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
-          .png()
-          .toBuffer()
-        doc.addImage(pngBuffer, 'PNG', 10, 3.9, 30, 15)
-        logoLoaded = true
-      }
-    } catch (logoErr) {
-      console.error("Error loading remote logo URL, falling back:", logoErr)
+  try {
+    const fs = await import('fs')
+    const path = await import('path')
+    const svgPath = path.join(process.cwd(), 'rm-white-logo3.svg')
+    const pngPath = path.join(process.cwd(), 'rm-white-logo3.png')
+
+    if (fs.existsSync(pngPath)) {
+      fs.unlinkSync(pngPath)
     }
-  }
 
-  if (!logoLoaded) {
-    try {
-      const fs = await import('fs')
-      const path = await import('path')
-      const svgPath = path.join(process.cwd(), 'rm-white-logo3.svg')
-      const pngPath = path.join(process.cwd(), 'rm-white-logo3.png')
+    if (fs.existsSync(svgPath)) {
+      await sharp(svgPath)
+        .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
+        .recomb([
+          [0.5, 0, 0.5],
+          [0, 0, 0],
+          [0.5, 0, 0.5]
+        ])
+        .png()
+        .toFile(pngPath)
 
-      if (fs.existsSync(pngPath)) {
-        fs.unlinkSync(pngPath)
-      }
-
-      if (fs.existsSync(svgPath)) {
-        await sharp(svgPath)
-          .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
-          .recomb([
-            [0.5, 0, 0.5],
-            [0, 0, 0],
-            [0.5, 0, 0.5]
-          ])
-          .png()
-          .toFile(pngPath)
-
-        const logoData = fs.readFileSync(pngPath)
-        const base64Image = logoData.toString('base64')
-        doc.addImage(base64Image, 'PNG', 10, 3.9, 30, 15)
-        logoLoaded = true
-      }
-    } catch (error) {
-      // If default logo processing fails, use text fallback
+      const logoData = fs.readFileSync(pngPath)
+      const base64Image = logoData.toString('base64')
+      doc.addImage(base64Image, 'PNG', 10, 3.9, 30, 15)
+      logoLoaded = true
     }
+  } catch (error) {
+    console.error("Error loading default Rishiraj Media logo for PDF:", error)
   }
 
   if (!logoLoaded) {

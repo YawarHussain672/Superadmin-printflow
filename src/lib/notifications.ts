@@ -96,8 +96,17 @@ export async function notifyProjectDelivered(projectId: string, pocId: string, c
 }
 
 export async function notifyAdminsNewApproval(projectId: string, projectName: string, projectIdStr: string, pocName: string, clientName?: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { tenantClientId: true },
+  })
+
   const admins = await prisma.user.findMany({
-    where: { role: "ADMIN", active: true },
+    where: { 
+      role: "ADMIN", 
+      active: true,
+      clientId: project?.tenantClientId || undefined
+    },
     select: { id: true, email: true, name: true },
   })
 
@@ -166,6 +175,7 @@ export async function notifyPICStatus(
       piNumber: piNumber || "",
       reason: notes,
       appUrl,
+      projectId,
     })
   }
 }
@@ -206,8 +216,17 @@ export async function notifyAdminPIPending(
   piNumber: string,
   pocName: string
 ) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { tenantClientId: true },
+  })
+
   const admins = await prisma.user.findMany({
-    where: { role: "ADMIN", active: true },
+    where: { 
+      role: "ADMIN", 
+      active: true,
+      clientId: project?.tenantClientId || undefined
+    },
     select: { id: true, email: true, name: true },
   })
 
@@ -235,6 +254,7 @@ export async function notifyAdminPIPending(
           piNumber,
           pocName,
           appUrl,
+          projectId,
         })
       } catch (emailError) {
         console.error(`[EMAIL ERROR] Failed to send PI pending email to admin ${admin.email}:`, emailError)

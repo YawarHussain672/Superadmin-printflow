@@ -148,29 +148,23 @@ async function getClientBrandingByUserEmail(email: string) {
 }
 
 function baseTemplate(title: string, body: string, clientName = "Rishiraj Media", clientLogo: string | null = null) {
-  const headerContent = clientLogo
-    ? `<img src="${clientLogo}" alt="${clientName}" style="max-height:40px;display:block;border:none;background:#003c71;padding:4px 8px;border-radius:4px;" />`
-    : `<h1 style="margin:0;color:#fff;font-size:20px;font-weight:700">${clientName}</h1>`
-
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0">
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 0">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-        <tr><td style="background:#003c71;padding:24px 32px">
-          ${headerContent}
-          <p style="margin:4px 0 0;color:#93c5fd;font-size:13px">Print Management System</p>
-        </td></tr>
-        <tr><td style="padding:32px 32px 16px">
-          <h2 style="margin:0 0 16px;color:#0f172a;font-size:18px">${title}</h2>
-          ${body}
-        </td></tr>
-        <tr><td style="padding:0">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);border:1px solid #f3e8ff">
+        <!-- Banner in the Head -->
+        <tr><td style="padding:0;background:#2a0a4b;text-align:center;">
           <a href="https://rishirajmedia.com/" target="_blank" style="display:block;text-decoration:none;border:none;">
-            <img src="cid:rm-signature-banner" alt="Rishiraj Media" style="width:100%;max-width:600px;height:auto;display:block;border:none;" />
+            <img src="cid:rm-signature-banner" alt="Rishiraj Media" style="width:100%;max-width:600px;height:auto;display:block;border:none;margin:0 auto;" />
           </a>
+        </td></tr>
+        <!-- Email Body -->
+        <tr><td style="padding:32px 32px 24px">
+          <h2 style="margin:0 0 16px;color:#1e1b4b;font-size:18px">${title}</h2>
+          ${body}
         </td></tr>
       </table>
     </td></tr>
@@ -181,12 +175,12 @@ function baseTemplate(title: string, body: string, clientName = "Rishiraj Media"
 
 function infoRow(label: string, value: string) {
   return `<tr>
-    <td style="padding:8px 12px;color:#64748b;font-size:13px;width:140px">${label}</td>
-    <td style="padding:8px 12px;color:#0f172a;font-size:13px;font-weight:600">${value}</td>
+    <td style="padding:8px 12px;color:#6b7280;font-size:13px;width:140px">${label}</td>
+    <td style="padding:8px 12px;color:#111827;font-size:13px;font-weight:600">${value}</td>
   </tr>`
 }
 
-function button(text: string, url: string, color = "#003c71") {
+function button(text: string, url: string, color = "#7c3aed") {
   return `<a href="${url}" style="display:inline-block;background:${color};color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;margin-top:16px">${text}</a>`
 }
 
@@ -198,8 +192,8 @@ export async function sendProjectApprovedEmail(to: string, data: {
     baseTemplate("Project Approved", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">Your project request has been reviewed and approved. The project will now proceed to the next stage.</p>
-      <p style="color:#003c71;margin:0 0 12px;font-weight:600">Project Details:</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <p style="color:#7c3aed;margin:0 0 12px;font-weight:600">Project Details:</p>
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project ID", data.projectId)}
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("Location", data.location)}
@@ -352,14 +346,14 @@ export async function sendAccountStatusEmail(to: string, data: {
 }
 
 export async function sendPIGeneratedEmail(to: string, data: {
-  pocName: string; projectName: string; piNumber: string; piDate: string; piAmount: string; appUrl: string
+  pocName: string; projectName: string; piNumber: string; piDate: string; piAmount: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `Attach: PI | Proforma Invoice Issued – ${data.projectName} | Action Required`,
     baseTemplate("Proforma Invoice Issued", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">A Proforma Invoice (PI) has been issued for the project below. Please review and take necessary action.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("PI Number", data.piNumber)}
         ${infoRow("PI Date", data.piDate)}
@@ -371,14 +365,14 @@ export async function sendPIGeneratedEmail(to: string, data: {
 }
 
 export async function sendProductionStartedEmail(to: string, data: {
-  pocName: string; projectName: string; piNumber: string; productionStartDate: string; appUrl: string
+  pocName: string; projectName: string; piNumber: string; productionStartDate: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `System Notification: Production Initiated – ${data.projectName} | Status Update`,
     baseTemplate("Production Initiated", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">Materials for the project below have moved to the Production Stage.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("Order / PI Reference", data.piNumber)}
         ${infoRow("Production Start Date", data.productionStartDate)}
@@ -390,14 +384,14 @@ export async function sendProductionStartedEmail(to: string, data: {
 }
 
 export async function sendShipmentDispatchedEmail(to: string, data: {
-  pocName: string; projectName: string; piNumber: string; dispatchDate: string; courier: string; deliveryAddress: string; appUrl: string
+  pocName: string; projectName: string; piNumber: string; dispatchDate: string; courier: string; deliveryAddress: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `Attach: Challan | System Notification: Material Dispatched – ${data.projectName} | Shipment Details`,
     baseTemplate("Material Dispatched", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">Materials for the project below have been dispatched from the production facility.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("Order / PI Reference", data.piNumber)}
         ${infoRow("Dispatch Date", data.dispatchDate)}
@@ -410,14 +404,14 @@ export async function sendShipmentDispatchedEmail(to: string, data: {
 }
 
 export async function sendPendingPOReminderEmail(to: string, data: {
-  pocName: string; projectName: string; piNumber: string; piDate: string; piAmount: string; appUrl: string
+  pocName: string; projectName: string; piNumber: string; piDate: string; piAmount: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `Attach: PI | Reminder: Pending PO – ${data.projectName} | Action Required`,
     baseTemplate("Pending Purchase Order Reminder", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">The Purchase Order (PO) for the project below is still pending as per system records.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("Proforma Invoice (PI) Number", data.piNumber)}
         ${infoRow("PI Date", data.piDate)}
@@ -429,14 +423,14 @@ export async function sendPendingPOReminderEmail(to: string, data: {
 }
 
 export async function sendOutstandingPaymentReminderEmail(to: string, data: {
-  pocName: string; projectName: string; invoiceNumber: string; invoiceDate: string; outstandingAmount: string; appUrl: string; referenceType?: string
+  pocName: string; projectName: string; invoiceNumber: string; invoiceDate: string; outstandingAmount: string; appUrl: string; referenceType?: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByProjectName(data.projectName)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `Attach ${data.referenceType || "Invoice"} | Reminder: Outstanding Payment Due – ${data.invoiceNumber} | Attention Required`,
     baseTemplate("Outstanding Payment Reminder", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">The following ${data.referenceType?.toLowerCase() || "invoice"} remains outstanding.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow(`${data.referenceType || "Invoice"} Number`, data.invoiceNumber)}
         ${infoRow(`${data.referenceType || "Invoice"} Date`, data.invoiceDate)}
@@ -448,14 +442,14 @@ export async function sendOutstandingPaymentReminderEmail(to: string, data: {
 }
 
 export async function sendPIVerifiedEmail(to: string, data: {
-  pocName: string; projectName: string; piNumber: string; appUrl: string
+  pocName: string; projectName: string; piNumber: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `System Notification: PI Verified – ${data.projectName} | Action Required`,
     baseTemplate("Proforma Invoice Verified", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">Your Proforma Invoice has been reviewed and verified by the Admin.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("PI Number", data.piNumber)}
         ${infoRow("Status", "Verified")}
@@ -466,14 +460,14 @@ export async function sendPIVerifiedEmail(to: string, data: {
 }
 
 export async function sendPIRejectedEmail(to: string, data: {
-  pocName: string; projectName: string; piNumber: string; reason?: string; appUrl: string
+  pocName: string; projectName: string; piNumber: string; reason?: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `System Notification: PI Rejected – ${data.projectName} | Action Required`,
     baseTemplate("Proforma Invoice Rejected", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.pocName},</p>
       <p style="color:#475569;margin:0 0 20px">Your Proforma Invoice has been reviewed and rejected.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("PI Number", data.piNumber)}
         ${infoRow("Status", "Rejected")}
@@ -492,7 +486,7 @@ export async function sendAdminNewProjectEmail(to: string, data: {
     baseTemplate("New Project Submitted for Approval", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.adminName},</p>
       <p style="color:#475569;margin:0 0 20px">A new project has been submitted and is pending your review and approval.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("Project ID", data.projectId)}
         ${infoRow("Submitted By", data.pocName)}
@@ -504,14 +498,14 @@ export async function sendAdminNewProjectEmail(to: string, data: {
 }
 
 export async function sendAdminPIPendingEmail(to: string, data: {
-  adminName: string; projectName: string; piNumber: string; pocName: string; appUrl: string
+  adminName: string; projectName: string; piNumber: string; pocName: string; appUrl: string; projectId: string
 }) {
-  const { clientName, clientLogo } = await getClientBrandingByPi(data.piNumber)
+  const { clientName, clientLogo } = await getClientBranding(data.projectId)
   await sendMail(to, `Action Required: PI Pending Verification – ${data.projectName} | Review Required`,
     baseTemplate("Proforma Invoice Pending Verification", `
       <p style="color:#475569;margin:0 0 20px">Dear ${data.adminName},</p>
       <p style="color:#475569;margin:0 0 20px">A Proforma Invoice has been generated and is pending your verification.</p>
-      <table style="background:#f8fafc;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
+      <table style="background:#faf5ff;border-radius:8px;width:100%;border-collapse:collapse;margin-bottom:20px">
         ${infoRow("Project Name", data.projectName)}
         ${infoRow("PI Number", data.piNumber)}
         ${infoRow("Generated By", data.pocName)}

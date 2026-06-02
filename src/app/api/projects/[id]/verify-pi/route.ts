@@ -104,6 +104,7 @@ export async function POST(
               piDate: new Date().toLocaleDateString("en-IN"),
               piAmount: formatCurrency(project.grandTotal),
               appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+              projectId: project.id,
             })
           }
           await notifyPOCPIVerified(

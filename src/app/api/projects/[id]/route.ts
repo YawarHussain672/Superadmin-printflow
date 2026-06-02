@@ -315,6 +315,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                 piNumber: existing.piNumber || existing.projectId,
                 productionStartDate: new Date().toLocaleDateString('en-IN'),
                 appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+                projectId: id,
               })
             } catch (emailError) {
               console.error("[EMAIL ERROR] Failed to send production started email:", emailError)
@@ -346,6 +347,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                 courier: (dispatchExists as any).courier || "Courier Partner",
                 deliveryAddress: existing.location || "Multiple / Address",
                 appUrl: process.env.NEXTAUTH_URL || "http://localhost:3000",
+                projectId: id,
               })
             } catch (emailError) {
               console.error("[EMAIL ERROR] Failed to send shipment dispatched email:", emailError)

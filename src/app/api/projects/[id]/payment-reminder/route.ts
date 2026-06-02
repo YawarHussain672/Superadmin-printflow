@@ -81,6 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       outstandingAmount: formatCurrency(project.grandTotal || project.totalCost * 1.18),
       appUrl: APP_URL,
       referenceType: referenceType, // Add this to email data
+      projectId: project.id,
     })
 
     // Log the activity

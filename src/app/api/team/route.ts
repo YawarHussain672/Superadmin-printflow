@@ -17,6 +17,7 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
+      where: session.user.clientId ? { clientId: session.user.clientId } : {},
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -68,7 +69,8 @@ export async function POST(request: NextRequest) {
         password: hashed,
         active: true,
         location,
-        branch
+        branch,
+        clientId: session.user.clientId || null
       },
     })
 

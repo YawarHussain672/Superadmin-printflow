@@ -231,6 +231,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 piDate: new Date(approval.project.createdAt).toLocaleDateString('en-IN'),
                 piAmount: formatCurrency(approval.project.grandTotal),
                 appUrl: APP_URL,
+                projectId: approval.project.id,
               })
             } catch (emailError) {
               console.error("[EMAIL ERROR] Failed to send PO reminder email:", emailError)

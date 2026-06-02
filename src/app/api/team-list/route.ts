@@ -13,6 +13,7 @@ export async function GET() {
         active: true,
         role: { in: ["POC", "CLIENT"] },
         ...(session.user.role === "POC" ? { id: session.user.id } : {}),
+        ...(session.user.clientId ? { clientId: session.user.clientId } : {}),
       },
       select: { id: true, name: true, role: true, email: true, phone: true, location: true, branch: true },
       orderBy: { name: "asc" },
