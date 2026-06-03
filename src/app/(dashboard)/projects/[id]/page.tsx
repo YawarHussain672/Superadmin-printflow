@@ -265,6 +265,13 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       active: project.status === ProjectStatus.APPROVED && project.files.some((f) => f.type === FileType.PO),
     },
     {
+      title: "Challan Uploaded",
+      date: project.files.find((f) => f.type === FileType.CHALLAN)?.uploadedAt ?? null,
+      note: project.files.some((f) => f.type === FileType.CHALLAN) ? "Delivery challan uploaded" : "Pending challan",
+      done: project.files.some((f) => f.type === FileType.CHALLAN),
+      active: project.status === ProjectStatus.PRINTING && !project.files.some((f) => f.type === FileType.CHALLAN),
+    },
+    {
       title: "Material Dispatched",
       date: project.dispatch?.dispatchDate ?? null,
       note: (() => {
@@ -275,13 +282,6 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       })(),
       done: !!project.dispatch?.dispatchDate || project.status === ProjectStatus.DISPATCHED || project.status === ProjectStatus.DELIVERED,
       active: project.status === ProjectStatus.PRINTING && project.files.some((f) => f.type === FileType.CHALLAN),
-    },
-    {
-      title: "Challan Uploaded",
-      date: project.files.find((f) => f.type === FileType.CHALLAN)?.uploadedAt ?? null,
-      note: project.files.some((f) => f.type === FileType.CHALLAN) ? "Delivery challan uploaded" : "Pending challan",
-      done: project.files.some((f) => f.type === FileType.CHALLAN),
-      active: project.status === ProjectStatus.DISPATCHED,
     },
     {
       title: "Tax Invoice Generated",

@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
     if (fileType === "PO" && !["APPROVED", "PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status)) {
       return NextResponse.json({ error: "PO can only be uploaded after project approval" }, { status: 400 })
     }
-    if (fileType === "CHALLAN" && !["DISPATCHED", "DELIVERED"].includes(project.status)) {
-      return NextResponse.json({ error: "Challan can only be uploaded after dispatch" }, { status: 400 })
+    if (fileType === "CHALLAN" && !["PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status)) {
+      return NextResponse.json({ error: "Challan can only be uploaded during printing, dispatch or delivery" }, { status: 400 })
     }
     if (fileType === "INVOICE" && !["DISPATCHED", "DELIVERED"].includes(project.status)) {
       return NextResponse.json({ error: "Invoice can only be uploaded after dispatch" }, { status: 400 })

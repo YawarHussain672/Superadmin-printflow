@@ -3,15 +3,57 @@
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Search, ToggleLeft, ToggleRight, Building, Plus, Eye } from "lucide-react"
+import { Search, ToggleLeft, ToggleRight, Building, Plus, Eye, Copy, Check } from "lucide-react"
 import { useDebounce } from "use-debounce"
 import { toast } from "sonner"
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      toast.success("Copied to clipboard!")
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error("Failed to copy.")
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      type="button"
+      className="copy-button-hover"
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: "4px",
+        borderRadius: "4px",
+        color: copied ? "#10b981" : "#9ca3af",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.2s ease",
+        verticalAlign: "middle",
+        marginLeft: "6px"
+      }}
+      title="Copy to clipboard"
+    >
+      {copied ? <Check size={14} /> : <Copy size={14} />}
+    </button>
+  )
+}
 
 interface Client {
   id: string
   companyName: string
   companyLogoUrl: string | null
   clientEmail: string
+  passwordText: string | null
   location: string
   branchLocation: string | null
   state: string
@@ -49,24 +91,28 @@ function AdminsInner() {
     }
   }, [searchParams])
 
-  const fetchClients = async () => {
-    setIsLoading(true)
+  const fetchClients = async (showLoader = true) => {
+    if (showLoader) setIsLoading(true)
     try {
       const params = new URLSearchParams()
       if (debouncedSearch) params.append("search", debouncedSearch)
       if (selectedState) params.append("state", selectedState)
       const res = await fetch(`/api/superadmin/clients?${params.toString()}`)
       if (res.ok) { const data = await res.json(); setClients(data.clients) }
-      else toast.error("Failed to load clients.")
-    } catch { toast.error("Failed to load clients.") }
-    finally { setIsLoading(false) }
+      else if (showLoader) toast.error("Failed to load clients.")
+    } catch { if (showLoader) toast.error("Failed to load clients.") }
+    finally { if (showLoader) setIsLoading(false) }
   }
 
-  useEffect(() => { fetchClients() }, [debouncedSearch, selectedState])
+  useEffect(() => { 
+    fetchClients(true) 
+    const interval = setInterval(() => fetchClients(false), 10000)
+    return () => clearInterval(interval)
+  }, [debouncedSearch, selectedState])
 
   // Refresh list when a new admin is created via the global modal
   useEffect(() => {
-    const handler = () => fetchClients()
+    const handler = () => fetchClients(true)
     window.addEventListener("refreshAdminsList", handler)
     return () => window.removeEventListener("refreshAdminsList", handler)
   }, [])
@@ -143,6 +189,7 @@ function AdminsInner() {
                   <th style={{ width: "60px" }}>Logo</th>
                   <th>Company Name</th>
                   <th>Admin Email</th>
+                  <th>Password</th>
                   <th>Location</th>
                   <th>State</th>
                   <th>Users</th>
@@ -154,7 +201,7 @@ function AdminsInner() {
               <tbody>
                 {clients.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", padding: "60px", color: "var(--gray-400)" }}>
+                    <td colSpan={10} style={{ textAlign: "center", padding: "60px", color: "var(--gray-400)" }}>
                       <Building size={48} style={{ margin: "0 auto 12px", strokeWidth: 1.5, color: "var(--gray-300)" }} />
                       <p style={{ fontWeight: 500 }}>No admin accounts found</p>
                       <p style={{ fontSize: "13px", marginTop: "4px" }}>Try refining your search or state filters.</p>
@@ -178,7 +225,22 @@ function AdminsInner() {
                             {client.companyName}
                           </Link>
                         </td>
-                        <td>{client.clientEmail}</td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <span>{client.clientEmail}</span>
+                            <CopyButton text={client.clientEmail} />
+                          </div>
+                        </td>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "13px" }}>
+                          {client.passwordText ? (
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <span>{client.passwordText}</span>
+                              <CopyButton text={client.passwordText} />
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td>{client.location}</td>
                         <td>{client.state}</td>
                         <td>{client.users.length}</td>
@@ -225,6 +287,7 @@ function AdminsInner() {
       <style>{`
         .hover-underline:hover { text-decoration: underline !important; }
         .spinner { width: 24px; height: 24px; border: 3px solid var(--gray-200); border-top: 3px solid #002a52; border-radius: 50%; animation: spin 1s linear infinite; }
+        .copy-button-hover:hover { background-color: var(--gray-100, #f3f4f6); color: var(--gray-700, #374151) !important; }
         @keyframes spin { 0% { transform: rotate(0deg) } 100% { transform: rotate(360deg) } }
       `}</style>
     </div>

@@ -1,47 +1,153 @@
-import { basePrisma } from "@/lib/prisma"
-import { notFound } from "next/navigation"
+"use client"
+
+import { use, useEffect, useState, useCallback } from "react"
+import { redirect, useRouter } from "next/navigation"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { formatDate, formatCurrency } from "@/utils/formatters"
-import { StatusBadge } from "@/components/ui/status-badge"
+import { ProjectStatus } from "@prisma/client"
+import { PISection } from "@/components/projects/pi-section"
+import { FileUploadButton } from "@/components/projects/file-upload-button"
 import { TrackButton } from "@/components/dispatch/track-button"
-import { FileText, Download, Eye, ArrowLeft, Calendar, MapPin, Building, FolderOpen } from "lucide-react"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
+
+// Icons
+const ArrowLeftIcon = () => (
+  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+  </svg>
+)
+
+interface ProjectFile {
+  id: string
+  type: "PO" | "CHALLAN" | "INVOICE"
+  url: string
+  filename: string
+  size: number | null
+  uploadedAt: string
+}
+
+interface Project {
+  id: string
+  projectId: string
+  name: string
+  description: string | null
+  status: ProjectStatus
+  piNumber: string | null
+  piStatus: string | null
+  piPdfUrl: string | null
+  piGeneratedAt: string | null
+  piVerifiedAt: string | null
+  createdAt: string
+  pocId: string | null
+  clientId: string | null
+  location: string
+  state: string
+  branch: string
+  totalCost: number
+  packingCharges: number | null
+  packingChargesGstRate: number | null
+  deliveryDate: string | null
+  instructions: string | null
+  recipientName?: string | null
+  recipientContact?: string | null
+  recipientBranch?: string | null
+  poc?: { id: string; name: string; email: string; phone: string; role?: string } | null
+  client?: { id: string; name: string; email: string; phone: string; role?: string } | null
+  tenantClient?: { id: string; companyName: string; companyLogoUrl: string | null } | null
+  pocName?: string | null
+  clientName?: string | null
+  collaterals: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
+  statusHistory: { id: string; status: ProjectStatus; note: string | null; timestamp: string }[]
+  files: ProjectFile[]
+  dispatch: {
+    dispatchDate: string | null
+    courier: string
+    trackingId: string
+    expectedDelivery: string | null
+    actualDelivery: string | null
+  } | null
+  approval: {
+    status: string
+    requestedById: string
+    approvedById: string | null
+    approvedAt: string | null
+  } | null
+  leadsGenerated: number | null
+  leadsConverted: number | null
+}
 
 interface SuperAdminProjectDetailPageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function SuperAdminProjectDetailPage({ params }: SuperAdminProjectDetailPageProps) {
-  const { id } = await params
+export default function SuperAdminProjectDetailPage({ params }: SuperAdminProjectDetailPageProps) {
+  const { id } = use(params)
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [project, setProject] = useState<Project | null>(null)
 
-  // Fetch the project and related data
-  const project = await basePrisma.project.findUnique({
-    where: { id },
-    include: {
-      poc: { select: { id: true, name: true, email: true, phone: true, role: true } },
-      client: { select: { id: true, name: true, email: true, phone: true, role: true } },
-      tenantClient: { select: { id: true, companyName: true, companyLogoUrl: true } },
-      collaterals: true,
-      statusHistory: { orderBy: { timestamp: "desc" } },
-      files: true,
-      dispatch: true,
-      approval: true,
-    },
-  })
+  const fetchProject = useCallback(async (): Promise<Project | null> => {
+    try {
+      const res = await fetch(`/api/projects/${id}`)
+      if (!res.ok) {
+        router.replace("/superadmin/projects")
+        return null
+      }
+      const data = await res.json()
+      setProject(data)
+      return data
+    } catch {
+      setProject(null)
+      return null
+    }
+  }, [id, router])
 
-  if (!project) {
-    notFound()
+  const refreshProject = async (): Promise<Project | null> => {
+    setLoading(true)
+    try {
+      return await fetchProject()
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Files categorized by type
-  const poFiles = project.files.filter((f) => f.type === "PO")
-  const challanFiles = project.files.filter((f) => f.type === "CHALLAN")
-  const invoiceFiles = project.files.filter((f) => f.type === "INVOICE")
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      redirect("/login")
+    }
+    if (status === "authenticated" && id) {
+      refreshProject()
+    }
+  }, [id, router, status])
 
-  // Timeline computation matching client-side flow
-  const getStatusHistory = (status: string) =>
-    project.statusHistory.find((h) => h.status === status)
+  // Real-time updates subscription via Pusher
+  useEffect(() => {
+    const client = getPusherClient()
+    const channel = client.subscribe(CHANNELS.PROJECTS)
 
-  const timelineSteps = [
+    const handleUpdated = (data?: { id?: string; projectId?: string }) => {
+      if (!data || (!data.id && !data.projectId) || data.id === id || data.projectId === id) {
+        void fetchProject()
+      }
+    }
+
+    channel.bind(EVENTS.PROJECT_UPDATED, handleUpdated)
+
+    return () => {
+      channel.unbind(EVENTS.PROJECT_UPDATED, handleUpdated)
+      client.unsubscribe(CHANNELS.PROJECTS)
+    }
+  }, [id, fetchProject])
+
+  // Guard calculations until project is loaded
+  const getStatusHistory = (status: ProjectStatus) =>
+    project?.statusHistory.find((h) => h.status === status)
+
+  // Timeline steps matching project state
+  const timelineSteps = project ? [
     {
       title: "Order Received",
       date: project.createdAt,
@@ -50,7 +156,7 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
     },
     {
       title: "Project Approved",
-      date: getStatusHistory("APPROVED")?.timestamp ?? project.approval?.approvedAt ?? null,
+      date: getStatusHistory(ProjectStatus.APPROVED)?.timestamp ?? project.approval?.approvedAt ?? null,
       note: (() => {
         if (project.approval?.status === "APPROVED") {
           return "Project approved by Admin"
@@ -60,8 +166,8 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
         }
         return "Pending admin approval"
       })(),
-      done: project.approval?.status === "APPROVED" || !!getStatusHistory("APPROVED"),
-      active: project.status === "REQUESTED" || project.approval?.status === "PENDING",
+      done: project.approval?.status === "APPROVED" || !!getStatusHistory(ProjectStatus.APPROVED),
+      active: project.status === ProjectStatus.REQUESTED || project.approval?.status === "PENDING",
     },
     {
       title: "PI Created",
@@ -92,19 +198,26 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
     },
     {
       title: "PO Generated",
-      date: poFiles[0]?.uploadedAt ?? null,
-      note: poFiles.length > 0
+      date: project.files.find((f) => f.type === "PO")?.uploadedAt ?? null,
+      note: project.files.some((f) => f.type === "PO")
         ? "Purchase Order received from client"
         : "Waiting for Purchase Order",
-      done: poFiles.length > 0,
-      active: project.piStatus === "VERIFIED" && poFiles.length === 0,
+      done: project.files.some((f) => f.type === "PO"),
+      active: project.piStatus === "VERIFIED" && !project.files.some((f) => f.type === "PO"),
     },
     {
       title: "Material Under Production",
-      date: getStatusHistory("PRINTING")?.timestamp ?? null,
-      note: getStatusHistory("PRINTING")?.note || "Production in progress",
-      done: !!getStatusHistory("PRINTING") || ["PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status),
-      active: project.status === "APPROVED" && poFiles.length > 0,
+      date: getStatusHistory(ProjectStatus.PRINTING)?.timestamp ?? null,
+      note: getStatusHistory(ProjectStatus.PRINTING)?.note || "Production in progress",
+      done: !!getStatusHistory(ProjectStatus.PRINTING) || project.status === ProjectStatus.PRINTING || project.status === ProjectStatus.DISPATCHED || project.status === ProjectStatus.DELIVERED,
+      active: project.status === ProjectStatus.APPROVED && project.files.some((f) => f.type === "PO"),
+    },
+    {
+      title: "Challan Uploaded",
+      date: project.files.find((f) => f.type === "CHALLAN")?.uploadedAt ?? null,
+      note: project.files.some((f) => f.type === "CHALLAN") ? "Delivery challan uploaded" : "Pending challan",
+      done: project.files.some((f) => f.type === "CHALLAN"),
+      active: project.status === ProjectStatus.PRINTING && !project.files.some((f) => f.type === "CHALLAN"),
     },
     {
       title: "Material Dispatched",
@@ -115,40 +228,45 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
         const tracking = project.dispatch.trackingId ? ` • Tracking: ${project.dispatch.trackingId}` : ""
         return dispatchInfo + tracking
       })(),
-      done: !!project.dispatch?.dispatchDate || ["DISPATCHED", "DELIVERED"].includes(project.status),
-      active: project.status === "PRINTING" && challanFiles.length > 0,
-    },
-    {
-      title: "Challan Uploaded",
-      date: challanFiles[0]?.uploadedAt ?? null,
-      note: challanFiles.length > 0 ? "Delivery challan uploaded" : "Pending challan",
-      done: challanFiles.length > 0,
-      active: project.status === "DISPATCHED",
+      done: !!project.dispatch?.dispatchDate || project.status === ProjectStatus.DISPATCHED || project.status === ProjectStatus.DELIVERED,
+      active: project.status === ProjectStatus.PRINTING && project.files.some((f) => f.type === "CHALLAN"),
     },
     {
       title: "Tax Invoice Generated",
-      date: invoiceFiles[0]?.uploadedAt ?? null,
-      note: invoiceFiles.length > 0 ? "Tax invoice generated" : "Pending invoice",
-      done: invoiceFiles.length > 0,
-      active: project.status === "DISPATCHED",
+      date: project.files.find((f) => f.type === "INVOICE")?.uploadedAt ?? null,
+      note: project.files.some((f) => f.type === "INVOICE") ? "Tax invoice generated" : "Pending invoice",
+      done: project.files.some((f) => f.type === "INVOICE"),
+      active: project.status === ProjectStatus.DISPATCHED,
     },
-  ]
+  ] : []
+
+  if (loading || !project) {
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+          <div style={{ width: '24px', height: '24px', background: 'var(--gray-200)', borderRadius: '4px' }} />
+          <div style={{ width: '150px', height: '16px', background: 'var(--gray-200)', borderRadius: '4px' }} />
+        </div>
+        <div style={{ height: '200px', background: 'var(--gray-100)', borderRadius: '14px' }} />
+      </div>
+    )
+  }
 
   // Cost calculations
   const itemsBaseCost = project.collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
-  const itemsGst = project.collaterals.reduce((sum, c) => sum + c.gstAmount, 0)
+  const itemsGst = project.collaterals.reduce((sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))), 0)
   const packingBaseCost = project.packingCharges || 0
   const packingGst = packingBaseCost * ((project.packingChargesGstRate ?? 18) / 100)
   const totalBaseCost = itemsBaseCost + packingBaseCost
   const totalGst = itemsGst + packingGst
-  const grandTotal = project.grandTotal || (totalBaseCost + totalGst)
+  const grandTotal = totalBaseCost + totalGst
 
   return (
-    <div className="detail-container" style={{ padding: "24px" }}>
+    <div className="detail-container" style={{ maxWidth: '100%', width: '100%' }}>
       {/* Breadcrumb Navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', fontSize: '14px', color: 'var(--gray-600)' }}>
         <Link href="/superadmin/projects" style={{ color: 'var(--axis-accent)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ArrowLeft size={16} /> Back to All Projects
+          <ArrowLeftIcon /> Back to All Projects
         </Link>
       </div>
 
@@ -182,7 +300,7 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
           <div className="detail-field">
             <span className="detail-label">Assigned To</span>
             <div className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {/* POC */}
+              {/* Line 1: POC */}
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
                 {project.poc?.name || project.pocName || "—"}
                 <span style={{
@@ -201,13 +319,13 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
                   POC
                 </span>
               </span>
-              {/* on behalf of */}
+              {/* Line 2: on behalf of */}
               {(project.client || project.clientName) && (
                 <span style={{ color: 'var(--gray-400)', fontSize: '12px', paddingLeft: '8px' }}>
                   on behalf of
                 </span>
               )}
-              {/* Client User */}
+              {/* Line 3: Client User */}
               {(project.client || project.clientName) && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
                   {project.client?.name || project.clientName}
@@ -314,12 +432,12 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
                     </div>
                   </div>
                 )}
-                <div className="item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', background: 'var(--gray-100)', marginTop: '12px', padding: '12px', borderRadius: '6px' }}>
-                  <span style={{ fontWeight: 700, fontSize: '13px' }}>Total Project Cost (excl. GST)</span>
-                  <span style={{ fontSize: '15px', color: 'var(--axis-primary)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                    {formatCurrency(itemsBaseCost + packingBaseCost)}
-                  </span>
-                </div>
+                  <div className="item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', background: 'var(--gray-100)', marginTop: '12px', padding: '12px', borderRadius: '6px' }}>
+                    <strong>Total Project Cost (excl. GST)</strong>
+                    <strong style={{ fontSize: '18px', color: 'var(--axis-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {formatCurrency(itemsBaseCost + packingBaseCost)}
+                    </strong>
+                  </div>
               </div>
             </div>
           </div>
@@ -378,12 +496,12 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
                   </span>
                 </div>
                 {/* Grand Total */}
-                <div className="item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: 'none', marginTop: '8px', borderTop: '2px solid var(--gray-300)' }}>
-                  <span style={{ color: 'var(--gray-900)', fontSize: '14px', fontWeight: 700 }}>Total Amount (incl. GST)</span>
-                  <span style={{ fontSize: '17px', color: 'var(--axis-primary)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                    {formatCurrency(grandTotal)}
-                  </span>
-                </div>
+                  <div className="item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: 'none', marginTop: '8px', borderTop: '2px solid var(--gray-300)' }}>
+                    <strong style={{ color: 'var(--gray-900)', fontSize: '16px' }}>Total Amount (incl. GST):</strong>
+                    <strong style={{ fontSize: '20px', color: 'var(--axis-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {formatCurrency(grandTotal)}
+                    </strong>
+                  </div>
               </div>
             </div>
           </div>
@@ -478,103 +596,21 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
             <div className="card-header">
               <h3 className="card-title">Proforma Invoice (PI)</h3>
             </div>
-            <div className="card-body" style={{ padding: "0 24px 24px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "16px 20px",
-                  background: "var(--gray-50)",
-                  borderRadius: "8px",
-                  border: "1px solid var(--gray-200)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <FileText size={24} color="var(--axis-primary)" />
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--gray-900)" }}>
-                      Proforma Invoice (PI)
-                    </h3>
-                    {project.piNumber ? (
-                      <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "var(--gray-600)" }}>
-                        {project.piNumber}
-                        {project.piGeneratedAt && (
-                          <span style={{ marginLeft: "8px" }}>
-                            • Generated {formatDate(project.piGeneratedAt)}
-                          </span>
-                        )}
-                      </p>
-                    ) : (
-                      <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--gray-500)" }}>
-                        No Proforma Invoice generated yet.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {project.piStatus && (
-                  <span
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      background: project.piStatus === "VERIFIED" ? "#dcfce7" : project.piStatus === "REJECTED" ? "#fee2e2" : "#fef9c3",
-                      color: project.piStatus === "VERIFIED" ? "#166534" : project.piStatus === "REJECTED" ? "#991b1b" : "#854d0e",
-                    }}
-                  >
-                    {project.piStatus === "VERIFIED" ? "✓ Verified" : project.piStatus === "REJECTED" ? "✗ Rejected" : "⏳ Pending"}
-                  </span>
-                )}
-              </div>
-
-              {project.piPdfUrl && (
-                <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
-                  <a
-                    href={`/api/projects/${project.id}/download-pi?inline=true`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "6px 14px",
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      color: "#374151",
-                      background: "#ffffff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "6px",
-                      textDecoration: "none",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    }}
-                  >
-                    <Eye size={14} />
-                    View PI
-                  </a>
-
-                  <a
-                    href={`/api/projects/${project.id}/download-pi`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "6px 14px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#ffffff",
-                      background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
-                      border: "none",
-                      borderRadius: "6px",
-                      textDecoration: "none",
-                      boxShadow: "0 2px 4px rgba(79, 70, 229, 0.15), 0 1px 2px rgba(0, 0, 0, 0.06)",
-                    }}
-                  >
-                    <Download size={14} />
-                    Download PI
-                  </a>
-                </div>
+            <div className="card-body">
+              {project && (
+                <PISection
+                  projectId={project.id}
+                  piNumber={project.piNumber}
+                  piStatus={project.piStatus}
+                  piPdfUrl={project.piPdfUrl}
+                  piGeneratedAt={project.piGeneratedAt}
+                  piVerifiedAt={project.piVerifiedAt}
+                  userRole={session?.user?.role || ""}
+                  userId={session?.user?.id || ""}
+                  pocId={project.pocId}
+                  clientId={project.clientId}
+                  onUpdate={fetchProject}
+                />
               )}
             </div>
           </div>
@@ -585,9 +621,38 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
               <h3 className="card-title">Documents & Files</h3>
             </div>
             <div className="card-body">
-              <DocumentItem label="Purchase Order (PO)" files={poFiles} />
-              <DocumentItem label="Delivery Challan" files={challanFiles} />
-              <DocumentItem label="Tax Invoice" files={invoiceFiles} />
+              {/* Purchase Order */}
+              <FileUploadButton
+                projectId={project.id}
+                fileType="PO"
+                label="Purchase Order (PO)"
+                existingFiles={project.files.filter((f) => f.type === "PO")}
+                isAdmin={false}
+                canUpload={false}
+                canDelete={false}
+              />
+
+              {/* Delivery Challan */}
+              <FileUploadButton
+                projectId={project.id}
+                fileType="CHALLAN"
+                label="Delivery Challan"
+                existingFiles={project.files.filter((f) => f.type === "CHALLAN")}
+                isAdmin={false}
+                canUpload={false}
+                canDelete={false}
+              />
+
+              {/* Tax Invoice */}
+              <FileUploadButton
+                projectId={project.id}
+                fileType="INVOICE"
+                label="Tax Invoice"
+                existingFiles={project.files.filter((f) => f.type === "INVOICE")}
+                isAdmin={false}
+                canUpload={false}
+                canDelete={false}
+              />
             </div>
           </div>
         </div>
@@ -617,100 +682,6 @@ export default async function SuperAdminProjectDetailPage({ params }: SuperAdmin
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// View-only document list item component
-function DocumentItem({ label, files }: { label: string; files: any[] }) {
-  return (
-    <div className="doc-section" style={{ background: 'var(--gray-50)', padding: '16px', borderRadius: '10px', marginBottom: '16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h4 style={{ fontWeight: 700, fontSize: '14px', color: 'var(--gray-900)' }}>{label}</h4>
-      </div>
-
-      {files.length > 0 ? (
-        <div>
-          {files.map((f) => (
-            <div
-              key={f.id}
-              className="doc-item"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                background: 'var(--gray-0)',
-                borderRadius: '6px',
-                border: '1px solid var(--gray-200)',
-                marginTop: '8px'
-              }}
-            >
-              <div className="doc-info" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="doc-icon" style={{
-                  width: '36px',
-                  height: '36px',
-                  background: 'var(--axis-primary)',
-                  color: 'white',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: '12px'
-                }}>
-                  PDF
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--gray-900)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.filename}>{f.filename}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-600)' }}>
-                    Uploaded: {formatDate(f.uploadedAt)}
-                  </div>
-                </div>
-              </div>
-              <div className="doc-actions" style={{ display: 'flex', gap: '8px' }}>
-                <a
-                  href={`/api/files/${f.id}/view`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textDecoration: 'none'
-                  }}
-                  title="View file"
-                >
-                  <Eye size={14} />
-                </a>
-                <a
-                  href={`/api/files/${f.id}/download`}
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textDecoration: 'none'
-                  }}
-                  title="Download file"
-                  download
-                >
-                  <Download size={14} />
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p style={{ color: 'var(--gray-500)', fontSize: '13px', margin: 0 }}>
-          No documents uploaded
-        </p>
-      )}
     </div>
   )
 }

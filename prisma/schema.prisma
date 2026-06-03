@@ -13,6 +13,7 @@ model Client {
   companyLogoUrl  String?
   clientEmail     String          @unique
   passwordHash    String
+  passwordText    String?
   location        String
   branchLocation  String?
   state           String

@@ -117,6 +117,15 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // Check if Challan is uploaded if we are transitioning to DISPATCHED
+        const challanExists = await prisma.fileUpload.findFirst({
+          where: { projectId: project.id, type: "CHALLAN" }
+        })
+        if (!challanExists) {
+          results.errors.push(`Project ${projectIdStr}: Challan must be uploaded before dispatch`)
+          continue
+        }
+
         // Create dispatch record
         await prisma.dispatch.create({
           data: {

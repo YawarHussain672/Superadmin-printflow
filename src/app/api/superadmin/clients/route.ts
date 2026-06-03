@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
           companyName,
           clientEmail,
           passwordHash,
+          passwordText: password,
           location,
           branchLocation: branchLocation || "Head Office",
           state,

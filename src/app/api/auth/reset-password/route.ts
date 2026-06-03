@@ -22,7 +22,12 @@ export async function POST(request: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 10)
 
-    await prisma.$transaction([
+    // Check if this email belongs to a client admin
+    const client = await prisma.client.findUnique({
+      where: { clientEmail: resetToken.email }
+    })
+
+    const transactionUpdates = [
       prisma.user.update({
         where: { email: resetToken.email },
         data: { password: hashed },
@@ -31,7 +36,21 @@ export async function POST(request: NextRequest) {
         where: { token },
         data: { used: true },
       }),
-    ])
+    ]
+
+    if (client) {
+      transactionUpdates.push(
+        prisma.client.update({
+          where: { clientEmail: resetToken.email },
+          data: {
+            passwordHash: hashed,
+            passwordText: password,
+          },
+        }) as any
+      )
+    }
+
+    await prisma.$transaction(transactionUpdates)
 
     return NextResponse.json({ success: true })
   } catch (error) {

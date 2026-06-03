@@ -175,6 +175,18 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      // Check if Challan is uploaded if we are transitioning to DISPATCHED
+      if (project.status !== ProjectStatus.DISPATCHED) {
+        const challanExists = await prisma.fileUpload.findFirst({
+          where: { projectId: project.id, type: "CHALLAN" }
+        })
+        if (!challanExists) {
+          results.skipped++
+          results.errors.push(`Project ${projectId}: Challan must be uploaded before dispatch`)
+          continue
+        }
+      }
+
       // Better date parsing
       const parseDate = (val: unknown): Date | undefined => {
         if (!val) return undefined

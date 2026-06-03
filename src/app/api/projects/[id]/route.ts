@@ -74,6 +74,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         poc: { select: { id: true, name: true, email: true, phone: true, role: true } },
         client: { select: { id: true, name: true, email: true, phone: true, role: true } },
+        tenantClient: { select: { id: true, companyName: true, companyLogoUrl: true } },
         collaterals: true,
         statusHistory: { orderBy: { timestamp: "desc" } },
         files: true,
@@ -86,8 +87,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Allow access if: admin, POC assigned, or client assigned
-    const isAuthorized = session.user.role === "ADMIN" ||
+    // Allow access if: admin, superadmin, POC assigned, or client assigned
+    const isAuthorized = session.user.role === "SUPERADMIN" ||
+      session.user.role === "ADMIN" ||
       project.pocId === session.user.id ||
       project.clientId === session.user.id
     if (!isAuthorized) {
@@ -334,6 +336,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           })
           if (!dispatchExists) {
             return NextResponse.json({ error: "Dispatch details required before moving to DISPATCHED status" }, { status: 400 })
+          }
+
+          // Check if Challan is uploaded
+          const challanExists = await prisma.fileUpload.findFirst({
+            where: { projectId: id, type: "CHALLAN" }
+          })
+          if (!challanExists) {
+            return NextResponse.json({ error: "Challan document required before moving to DISPATCHED status" }, { status: 400 })
           }
 
           // Send Shipment Dispatched email to POC
