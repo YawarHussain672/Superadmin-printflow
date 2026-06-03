@@ -27,8 +27,8 @@ export async function GET(
       return NextResponse.json({ error: "File not found" }, { status: 404 })
     }
 
-    // Check permissions - Admin, POC owner, or Client assigned to project
-    const isAdmin = session.user.role === "ADMIN"
+    // Check permissions - Admin, SuperAdmin, POC owner, or Client assigned to project
+    const isAdmin = session.user.role === "ADMIN" || session.user.role === "SUPERADMIN"
     const isOwner = fileRecord.project?.pocId === session.user.id
     const isAssignedClient = fileRecord.project?.clientId === session.user.id
 

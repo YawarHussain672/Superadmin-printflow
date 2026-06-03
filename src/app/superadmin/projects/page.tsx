@@ -122,11 +122,23 @@ export default async function SuperAdminProjectsPage({ searchParams }: SuperAdmi
                     return (
                       <tr key={project.id}>
                         <td style={{ fontWeight: 600 }} className="font-mono">
-                          {project.projectId}
+                          <Link 
+                            href={`/superadmin/projects/${project.id}`}
+                            style={{ color: "var(--axis-primary)", textDecoration: "none" }}
+                            className="hover:underline"
+                          >
+                            {project.projectId}
+                          </Link>
                         </td>
                         <td>
                           <div style={{ fontWeight: 600, color: "var(--gray-900)", maxWidth: "200px", whiteSpace: "normal", wordBreak: "break-word" }}>
-                            {project.name}
+                            <Link 
+                              href={`/superadmin/projects/${project.id}`}
+                              style={{ color: "inherit", textDecoration: "none" }}
+                              className="hover:underline"
+                            >
+                              {project.name}
+                            </Link>
                           </div>
                         </td>
                         <td>

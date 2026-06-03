@@ -32,9 +32,10 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
 
-    // Only POC, CLIENT (own project), or ADMIN can download
+    // Only POC, CLIENT (own project), ADMIN, or SUPERADMIN can download
     const isAuthorized =
       session.user.role === "ADMIN" ||
+      session.user.role === "SUPERADMIN" ||
       session.user.id === project.pocId ||
       session.user.id === project.clientId
 

@@ -30,7 +30,7 @@ export async function GET(
     }
 
     // Check permissions
-    const isAdmin = session.user.role === "ADMIN"
+    const isAdmin = session.user.role === "ADMIN" || session.user.role === "SUPERADMIN"
     const isOwner = fileRecord.project.pocId === session.user.id
 
     if (!isAdmin && !isOwner) {
