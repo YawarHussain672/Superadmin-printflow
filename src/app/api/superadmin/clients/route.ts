@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { basePrisma } from "@/lib/prisma"
-import { uploadToS3 } from "@/lib/s3"
+import { uploadToS3, getPresignedUrl } from "@/lib/s3"
 import { sendAdminWelcomeEmail } from "@/lib/email"
 import bcrypt from "bcryptjs"
 import { UserRole } from "@prisma/client"
@@ -186,7 +186,19 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ clients })
+    const signedClients = await Promise.all(
+      clients.map(async (client) => {
+        if (client.companyLogoUrl && client.companyLogoUrl.includes("amazonaws.com")) {
+          return {
+            ...client,
+            companyLogoUrl: await getPresignedUrl(client.companyLogoUrl)
+          }
+        }
+        return client
+      })
+    )
+
+    return NextResponse.json({ clients: signedClients })
   } catch (error) {
     console.error("Get Clients Error:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })

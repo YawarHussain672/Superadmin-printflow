@@ -39,6 +39,7 @@ async function main() {
       companyName: "Axis Max Life",
       clientEmail: "admin@axismaxlife.com",
       passwordHash: clientPasswordHash,
+      passwordText: "Admin@123",
       location: "Gurugram",
       branchLocation: "3rd Floor, Operations Centre, 90-A, Udyog Vihar, Sector 18, Gurugram, Haryana - 122015, India",
       state: "Haryana",
@@ -139,8 +140,8 @@ async function main() {
       packingCharges: 500.0,
       createdAt: new Date('2026-04-15T00:00:00Z'),
       deliveryDate: new Date('2026-04-17T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 43,
+      leadsConverted: 3,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -158,8 +159,8 @@ async function main() {
       packingCharges: 1500.0,
       createdAt: new Date('2026-01-12T00:00:00Z'),
       deliveryDate: new Date('2026-01-13T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 63,
+      leadsConverted: 9,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -177,8 +178,8 @@ async function main() {
       packingCharges: 1500.0,
       createdAt: new Date('2026-01-21T00:00:00Z'),
       deliveryDate: new Date('2026-01-22T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 154,
+      leadsConverted: 10,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -196,8 +197,8 @@ async function main() {
       packingCharges: 500.0,
       createdAt: new Date('2026-01-29T00:00:00Z'),
       deliveryDate: new Date('2026-02-10T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 89,
+      leadsConverted: 12,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -215,8 +216,8 @@ async function main() {
       packingCharges: 500.0,
       createdAt: new Date('2026-02-11T00:00:00Z'),
       deliveryDate: new Date('2026-02-18T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 203,
+      leadsConverted: 22,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -253,8 +254,8 @@ async function main() {
       packingCharges: 500.0,
       createdAt: new Date('2026-02-09T00:00:00Z'),
       deliveryDate: new Date('2026-03-06T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 104,
+      leadsConverted: 14,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -272,8 +273,8 @@ async function main() {
       packingCharges: 2000.0,
       createdAt: new Date('2026-02-11T00:00:00Z'),
       deliveryDate: new Date('2026-02-13T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 150,
+      leadsConverted: 16,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -291,8 +292,8 @@ async function main() {
       packingCharges: 5000.0,
       createdAt: new Date('2026-03-09T00:00:00Z'),
       deliveryDate: new Date('2026-03-10T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 151,
+      leadsConverted: 18,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -310,8 +311,8 @@ async function main() {
       packingCharges: 100.0,
       createdAt: new Date('2026-03-12T00:00:00Z'),
       deliveryDate: new Date('2026-03-18T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 10,
+      leadsConverted: 1,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -329,8 +330,8 @@ async function main() {
       packingCharges: 600.0,
       createdAt: new Date('2026-03-12T00:00:00Z'),
       deliveryDate: new Date('2026-04-29T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 25,
+      leadsConverted: 2,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -367,8 +368,8 @@ async function main() {
       packingCharges: 1500.0,
       createdAt: new Date('2026-03-20T00:00:00Z'),
       deliveryDate: new Date('2026-04-10T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 142,
+      leadsConverted: 19,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -386,8 +387,8 @@ async function main() {
       packingCharges: 3000.0,
       createdAt: new Date('2026-04-22T00:00:00Z'),
       deliveryDate: new Date('2026-04-29T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 493,
+      leadsConverted: 28,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -405,8 +406,8 @@ async function main() {
       packingCharges: 500.0,
       createdAt: new Date('2026-04-06T00:00:00Z'),
       deliveryDate: new Date('2026-04-08T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 78,
+      leadsConverted: 10,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -424,8 +425,8 @@ async function main() {
       packingCharges: 100.0,
       createdAt: new Date('2026-03-06T00:00:00Z'),
       deliveryDate: new Date('2026-03-10T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 34,
+      leadsConverted: 4,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -443,8 +444,8 @@ async function main() {
       packingCharges: 200.0,
       createdAt: new Date('2026-02-13T00:00:00Z'),
       deliveryDate: new Date('2026-02-18T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 31,
+      leadsConverted: 2,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -462,8 +463,8 @@ async function main() {
       packingCharges: 2000.0,
       createdAt: new Date('2026-01-13T00:00:00Z'),
       deliveryDate: new Date('2026-01-18T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 348,
+      leadsConverted: 47,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -500,8 +501,8 @@ async function main() {
       packingCharges: 600.0,
       createdAt: new Date('2026-02-04T00:00:00Z'),
       deliveryDate: new Date('2026-02-05T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 94,
+      leadsConverted: 7,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -538,8 +539,8 @@ async function main() {
       packingCharges: 100.0,
       createdAt: new Date('2026-02-19T00:00:00Z'),
       deliveryDate: new Date('2026-02-20T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 10,
+      leadsConverted: 1,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -557,8 +558,8 @@ async function main() {
       packingCharges: 350.0,
       createdAt: new Date('2026-02-19T00:00:00Z'),
       deliveryDate: new Date('2026-02-19T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 76,
+      leadsConverted: 11,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -576,8 +577,8 @@ async function main() {
       packingCharges: 0.0,
       createdAt: new Date('2026-01-12T00:00:00Z'),
       deliveryDate: new Date('2026-02-09T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 745,
+      leadsConverted: 107,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -595,8 +596,8 @@ async function main() {
       packingCharges: 0.0,
       createdAt: new Date('2026-01-12T00:00:00Z'),
       deliveryDate: new Date('2026-02-09T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 745,
+      leadsConverted: 107,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -614,8 +615,8 @@ async function main() {
       packingCharges: 0.0,
       createdAt: new Date('2026-01-12T00:00:00Z'),
       deliveryDate: new Date('2026-02-09T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 745,
+      leadsConverted: 107,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -633,8 +634,8 @@ async function main() {
       packingCharges: 0.0,
       createdAt: new Date('2026-01-12T00:00:00Z'),
       deliveryDate: new Date('2026-02-09T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 745,
+      leadsConverted: 107,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -652,8 +653,8 @@ async function main() {
       packingCharges: 0.0,
       createdAt: new Date('2026-02-24T00:00:00Z'),
       deliveryDate: new Date('2026-02-28T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 630,
+      leadsConverted: 81,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -671,8 +672,8 @@ async function main() {
       packingCharges: 4000.0,
       createdAt: new Date('2026-03-27T00:00:00Z'),
       deliveryDate: new Date('2026-04-07T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 604,
+      leadsConverted: 90,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -690,8 +691,8 @@ async function main() {
       packingCharges: 4000.0,
       createdAt: new Date('2026-03-27T00:00:00Z'),
       deliveryDate: new Date('2026-04-07T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 604,
+      leadsConverted: 90,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -709,8 +710,8 @@ async function main() {
       packingCharges: 1500.0,
       createdAt: new Date('2026-02-23T00:00:00Z'),
       deliveryDate: new Date('2026-02-26T00:00:00Z'),
-      leadsGenerated: 0,
-      leadsConverted: 0,
+      leadsGenerated: 206,
+      leadsConverted: 19,
       statusHistory: [
         { status: ProjectStatus.DELIVERED, note: "Imported from CSV" },
       ],
@@ -740,6 +741,8 @@ async function main() {
         pocId: pocs[proj.pocIndex].id,
         createdAt: proj.createdAt,
         tenantClientId: defaultClient.id,
+        leadsGenerated: proj.leadsGenerated,
+        leadsConverted: proj.leadsConverted,
         collaterals: {
           create: proj.collaterals,
         },
@@ -784,16 +787,7 @@ async function main() {
       })
     }
 
-    // Add leads tracking data if any
-    if (proj.leadsGenerated || proj.leadsConverted) {
-      await prisma.project.update({
-        where: { id: project.id },
-        data: {
-          leadsGenerated: proj.leadsGenerated,
-          leadsConverted: proj.leadsConverted,
-        },
-      })
-    }
+
 
     // Add POD file URL to dispatch if dispatch exists
     if (proj.dispatch) {

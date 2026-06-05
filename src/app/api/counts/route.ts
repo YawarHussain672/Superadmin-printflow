@@ -12,11 +12,13 @@ export async function GET() {
     }
 
     const isAdmin = session.user.role === "ADMIN"
-    const pocFilter = isAdmin ? {} : { pocId: session.user.id }
+    const isSuperAdmin = session.user.role === "SUPERADMIN"
+    const isPrivileged = isAdmin || isSuperAdmin
+    const pocFilter = isPrivileged ? {} : { pocId: session.user.id }
 
     const [totalProjects, pendingApprovals] = await Promise.all([
       prisma.project.count({ where: pocFilter }),
-      isAdmin
+      isPrivileged
         ? prisma.approval.count({ where: { status: "PENDING" } })
         : prisma.approval.count({ where: { status: "PENDING", requestedById: session.user.id } }),
     ])

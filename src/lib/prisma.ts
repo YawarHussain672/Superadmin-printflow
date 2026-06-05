@@ -25,13 +25,15 @@ export const prisma = basePrisma.$extends({
         ]
 
         if (modelsWithClientId.includes(model)) {
-          let session = null
-          try {
-            // Dynamic session lookup in request context with dynamic import to break circular dependency
-            const { authOptions } = await import("./auth")
-            session = await getServerSession(authOptions)
-          } catch {
-            // Outside request context (e.g. seed, migrations)
+          let session = (global as any).mockSession !== undefined ? (global as any).mockSession : null
+          if (!session) {
+            try {
+              // Dynamic session lookup in request context with dynamic import to break circular dependency
+              const { authOptions } = await import("./auth")
+              session = await getServerSession(authOptions)
+            } catch {
+              // Outside request context (e.g. seed, migrations)
+            }
           }
 
           if (session && session.user.role !== 'SUPERADMIN' && session.user.clientId) {

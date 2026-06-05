@@ -52,8 +52,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     }
 
     const isAdmin = session.user.role === "ADMIN"
+    const isSuperAdmin = session.user.role === "SUPERADMIN"
     const isOwner = dispatch.project.pocId === session.user.id
-    if (!isAdmin && !isOwner) {
+    if (!isAdmin && !isSuperAdmin && !isOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

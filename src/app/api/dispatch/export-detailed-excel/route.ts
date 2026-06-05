@@ -22,8 +22,9 @@ export async function GET() {
     }
 
     const isAdmin = session.user.role === "ADMIN"
+    const isSuperAdmin = session.user.role === "SUPERADMIN"
     const dispatches = await prisma.dispatch.findMany({
-      where: !isAdmin ? { project: { pocId: session.user.id } } : {},
+      where: (!isAdmin && !isSuperAdmin) ? { project: { pocId: session.user.id } } : {},
       include: {
         project: {
           select: { id: true, projectId: true, name: true },

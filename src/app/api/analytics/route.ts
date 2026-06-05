@@ -115,14 +115,15 @@ async function handler(request: NextRequest) {
         ORDER BY DATE_TRUNC('month', p."createdAt") DESC
         LIMIT 12
       `,
-      prisma.$queryRaw<Array<{ total_leads: bigint; total_converted: bigint }>>`
+      prisma.$queryRaw<Array<{ total_leads: bigint; total_converted: bigint; spend_for_cpl: number; spend_for_cpa: number }>>`
         SELECT
           COALESCE(SUM(p."leadsGenerated"), 0) as total_leads,
-          COALESCE(SUM(p."leadsConverted"), 0) as total_converted
+          COALESCE(SUM(p."leadsConverted"), 0) as total_converted,
+          COALESCE(SUM(CASE WHEN p."leadsGenerated" IS NOT NULL AND p."leadsGenerated" > 0 THEN p."totalCost" ELSE 0 END), 0) as spend_for_cpl,
+          COALESCE(SUM(CASE WHEN p."leadsConverted" IS NOT NULL AND p."leadsConverted" > 0 THEN p."totalCost" ELSE 0 END), 0) as spend_for_cpa
         FROM projects p
         INNER JOIN approvals a ON a."projectId" = p.id
-        WHERE p."leadsGenerated" IS NOT NULL 
-          AND a.status = 'APPROVED'
+        WHERE a.status = 'APPROVED'
           AND (${isFilterApplied} = false OR p."tenantClientId" = ${targetClientId})
       `,
       // Branch-wise marketing data - only show branches with real project data
@@ -154,9 +155,12 @@ async function handler(request: NextRequest) {
 
     const totalLeadsGenerated = Number(leadStats[0]?.total_leads ?? 0)
     const totalLeadsConverted = Number(leadStats[0]?.total_converted ?? 0)
+    const spendForCPL = Number(leadStats[0]?.spend_for_cpl ?? 0)
+    const spendForCPA = Number(leadStats[0]?.spend_for_cpa ?? 0)
+
     const conversionRate = totalLeadsGenerated > 0 ? (totalLeadsConverted / totalLeadsGenerated) * 100 : 0
-    const avgCPL = totalLeadsGenerated > 0 ? totalSpend / totalLeadsGenerated : 0
-    const avgCPA = totalLeadsConverted > 0 ? totalSpend / totalLeadsConverted : 0
+    const avgCPL = totalLeadsGenerated > 0 ? spendForCPL / totalLeadsGenerated : 0
+    const avgCPA = totalLeadsConverted > 0 ? spendForCPA / totalLeadsConverted : 0
 
     return NextResponse.json({
       totalProjects: Number(totalProjects),

@@ -44,6 +44,12 @@ const RupeeIcon = () => (
   </svg>
 )
 
+const ProjectsIcon = () => (
+  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+  </svg>
+)
+
 function StatCard({ label, value, icon, iconBg, iconColor, className = "" }: {
   label: string
   value: string | number
@@ -71,6 +77,7 @@ export default async function SuperAdminDashboard() {
   // Query aggregated metrics across all tenants (Prisma client extensions do not scope query since user role is SUPERADMIN)
   const [
     totalClients,
+    activeProjects,
     pendingApproval,
     inProduction,
     inTransit,
@@ -80,13 +87,17 @@ export default async function SuperAdminDashboard() {
     recentClients,
   ] = await Promise.all([
     prisma.client.count({ where: { isActive: true } }),
+    prisma.project.count({ where: { status: { not: ProjectStatus.CANCELLED } } }),
     prisma.approval.count({ where: { status: ApprovalStatus.PENDING } }),
     prisma.project.count({ where: { status: ProjectStatus.PRINTING } }),
     prisma.project.count({ where: { status: ProjectStatus.DISPATCHED } }),
     prisma.project.count({ where: { status: ProjectStatus.DELIVERED } }),
     prisma.project.count({ where: { status: ProjectStatus.CANCELLED } }),
     prisma.project.aggregate({
-      where: { status: { not: ProjectStatus.CANCELLED } },
+      where: {
+        status: { not: ProjectStatus.CANCELLED },
+        approval: { status: ApprovalStatus.APPROVED }
+      },
       _sum: { grandTotal: true },
     }),
     prisma.client.findMany({
@@ -96,6 +107,19 @@ export default async function SuperAdminDashboard() {
   ])
 
   const totalSpend = totalSpendResult._sum.grandTotal || 0
+
+  const { getPresignedUrl } = await import("@/lib/s3")
+  const signedRecentClients = await Promise.all(
+    recentClients.map(async (client) => {
+      if (client.companyLogoUrl && client.companyLogoUrl.includes("amazonaws.com")) {
+        return {
+          ...client,
+          companyLogoUrl: await getPresignedUrl(client.companyLogoUrl)
+        }
+      }
+      return client
+    })
+  )
 
   return (
     <div>
@@ -113,6 +137,13 @@ export default async function SuperAdminDashboard() {
           icon={<FolderIcon />}
           iconBg="rgba(139, 92, 246, 0.1)"
           iconColor="#8b5cf6"
+        />
+        <StatCard
+          label="Active Projects"
+          value={activeProjects}
+          icon={<ProjectsIcon />}
+          iconBg="rgba(0, 168, 204, 0.1)"
+          iconColor="var(--axis-accent)"
         />
         <StatCard
           label="Pending Approval"
@@ -182,14 +213,14 @@ export default async function SuperAdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentClients.length === 0 ? (
+              {signedRecentClients.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: "center", padding: "32px", color: "var(--gray-500)" }}>
                     No client accounts created yet.
                   </td>
                 </tr>
               ) : (
-                recentClients.map((client) => (
+                signedRecentClients.map((client) => (
                   <tr key={client.id}>
                     <td>
                       <div style={{

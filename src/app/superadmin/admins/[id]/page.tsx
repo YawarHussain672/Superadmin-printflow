@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Building, Mail, MapPin, Shield, Folder, CheckCircle2, TrendingUp, Users } from "lucide-react"
 import { StatusToggleButton } from "@/components/superadmin/status-toggle-button"
+import { DeleteOrganizationButton } from "@/components/superadmin/delete-organization-button"
 import { ProjectStatus } from "@prisma/client"
 
 interface AdminDetailPageProps {
@@ -29,6 +30,11 @@ export default async function AdminDetailPage({ params }: AdminDetailPageProps) 
 
   if (!client) {
     notFound()
+  }
+
+  const { getPresignedUrl } = await import("@/lib/s3")
+  if (client.companyLogoUrl && client.companyLogoUrl.includes("amazonaws.com")) {
+    client.companyLogoUrl = await getPresignedUrl(client.companyLogoUrl)
   }
 
   // Calculate metrics
@@ -95,7 +101,10 @@ export default async function AdminDetailPage({ params }: AdminDetailPageProps) 
             </div>
           </div>
 
-          <StatusToggleButton clientId={client.id} initialIsActive={client.isActive} />
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <StatusToggleButton clientId={client.id} initialIsActive={client.isActive} />
+            <DeleteOrganizationButton clientId={client.id} companyName={client.companyName} />
+          </div>
         </div>
       </div>
 
@@ -205,9 +214,25 @@ export default async function AdminDetailPage({ params }: AdminDetailPageProps) 
                 ) : (
                   client.projects.map((project) => (
                     <tr key={project.id}>
-                      <td style={{ fontWeight: 600 }} className="font-mono">{project.projectId}</td>
+                      <td style={{ fontWeight: 600 }} className="font-mono">
+                        <Link 
+                          href={`/superadmin/projects/${project.id}`}
+                          style={{ color: "var(--axis-primary)", textDecoration: "none" }}
+                          className="hover:underline"
+                        >
+                          {project.projectId}
+                        </Link>
+                      </td>
                       <td>
-                        <div style={{ fontWeight: 600, color: "var(--gray-900)" }}>{project.name}</div>
+                        <div style={{ fontWeight: 600, color: "var(--gray-900)" }}>
+                          <Link 
+                            href={`/superadmin/projects/${project.id}`}
+                            style={{ color: "inherit", textDecoration: "none" }}
+                            className="hover:underline"
+                          >
+                            {project.name}
+                          </Link>
+                        </div>
                         <div style={{ fontSize: "12px", color: "var(--gray-400)" }}>{project.location}</div>
                       </td>
                       <td>{project.poc?.name || "—"}</td>

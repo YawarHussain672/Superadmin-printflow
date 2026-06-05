@@ -139,7 +139,12 @@ export const authOptions: NextAuthOptions = {
             }
             companyName = client.companyName
             if (client.companyLogoUrl) {
-              companyLogoUrl = client.companyLogoUrl
+              if (client.companyLogoUrl.includes("amazonaws.com")) {
+                const { getPresignedUrl } = await import("./s3")
+                companyLogoUrl = await getPresignedUrl(client.companyLogoUrl)
+              } else {
+                companyLogoUrl = client.companyLogoUrl
+              }
             }
           }
 

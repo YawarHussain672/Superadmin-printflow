@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Search, ToggleLeft, ToggleRight, Building, Plus, Eye, Copy, Check } from "lucide-react"
+import { Search, ToggleLeft, ToggleRight, Building, Plus, Eye, Copy, Check, Trash2 } from "lucide-react"
 import { useDebounce } from "use-debounce"
 import { toast } from "sonner"
 
@@ -131,6 +131,34 @@ function AdminsInner() {
       }
     } catch { toast.error("Failed to update client.") }
     finally { setTogglingIds(prev => { const n = new Set(prev); n.delete(id); return n }) }
+  }
+
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+
+  const handleDeleteClient = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to permanently delete the organization "${name}"? This will delete all users, projects, and files associated with it.`)) {
+      return
+    }
+
+    setDeletingIds(prev => new Set(prev).add(id))
+    try {
+      const res = await fetch(`/api/superadmin/clients/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setClients(prev => prev.filter(c => c.id !== id))
+        toast.success(`Organization "${name}" deleted successfully.`)
+      } else {
+        const errData = await res.json()
+        toast.error(errData.error || "Failed to delete organization.")
+      }
+    } catch {
+      toast.error("Failed to delete organization.")
+    } finally {
+      setDeletingIds(prev => {
+        const n = new Set(prev)
+        n.delete(id)
+        return n
+      })
+    }
   }
 
   return (
@@ -261,7 +289,7 @@ function AdminsInner() {
                             <button
                               className={`btn ${client.isActive ? "btn-secondary" : "btn-primary"}`}
                               onClick={() => handleToggleActive(client.id, client.isActive)}
-                              disabled={isToggling}
+                              disabled={isToggling || deletingIds.has(client.id)}
                               style={{
                                 padding: "6px 12px", display: "flex", alignItems: "center", gap: "6px",
                                 border: client.isActive ? "1px solid var(--color-error)" : undefined,
@@ -270,6 +298,23 @@ function AdminsInner() {
                               }}
                             >
                               {client.isActive ? <><ToggleLeft size={16} />Suspend</> : <><ToggleRight size={16} />Activate</>}
+                            </button>
+                            <button
+                              className="btn"
+                              onClick={() => handleDeleteClient(client.id, client.companyName)}
+                              disabled={isToggling || deletingIds.has(client.id)}
+                              style={{
+                                padding: "6px 12px", display: "flex", alignItems: "center", gap: "6px",
+                                border: "1px solid #ef4444",
+                                color: "white",
+                                background: "#ef4444",
+                                cursor: "pointer",
+                                borderRadius: "6px",
+                                fontSize: "14px",
+                                fontWeight: 500
+                              }}
+                            >
+                              <Trash2 size={14} /> Delete
                             </button>
                           </div>
                         </td>
