@@ -23,6 +23,8 @@ const createProjectSchema = z.object({
   instructions: z.string().max(1000).optional(),
   packingCharges: z.number().min(0).default(0),
   packingChargesGstRate: z.number().min(0).max(100).default(18),
+  deliveryCharges: z.number().min(0).default(0),
+  deliveryChargesGstRate: z.number().min(0).max(100).default(18),
   totalCost: z.number().min(0).optional(),
   recipientName: z.string().optional(),
   recipientContact: z.string().optional(),
@@ -164,7 +166,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { name, description, pocId, clientId, location, branch, state, deliveryDate, instructions, packingCharges, packingChargesGstRate, collaterals, totalCost, recipientName, recipientContact, recipientBranch, leadsGenerated, leadsConverted } = parsed.data
+    const { name, description, pocId, clientId, location, branch, state, deliveryDate, instructions, packingCharges, packingChargesGstRate, deliveryCharges, deliveryChargesGstRate, collaterals, totalCost, recipientName, recipientContact, recipientBranch, leadsGenerated, leadsConverted } = parsed.data
 
     // POC is required
     if (!pocId) {
@@ -237,9 +239,11 @@ export async function POST(request: NextRequest) {
     const collateralsGst = priced.totalGst
     const packingSubtotal = packingCharges || 0
     const packingGst = packingSubtotal * (packingChargesGstRate / 100)
+    const deliverySubtotal = deliveryCharges || 0
+    const deliveryGst = deliverySubtotal * (deliveryChargesGstRate / 100)
 
-    const totalSubtotal = collateralsSubtotal + packingSubtotal
-    const totalGrandTotal = collateralsSubtotal + collateralsGst + packingSubtotal + packingGst
+    const totalSubtotal = collateralsSubtotal + packingSubtotal + deliverySubtotal
+    const totalGrandTotal = collateralsSubtotal + collateralsGst + packingSubtotal + packingGst + deliverySubtotal + deliveryGst
 
     const project = await prisma.project.create({
       data: {
@@ -257,6 +261,8 @@ export async function POST(request: NextRequest) {
         instructions,
         packingCharges: packingSubtotal,
         packingChargesGstRate: packingChargesGstRate,
+        deliveryCharges: deliverySubtotal,
+        deliveryChargesGstRate: deliveryChargesGstRate,
         totalCost: totalSubtotal,
         grandTotal: totalGrandTotal,
         recipientName,
