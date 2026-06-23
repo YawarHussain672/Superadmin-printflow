@@ -17,7 +17,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "You cannot modify your own account" }, { status: 403 })
     }
 
-    const { name, phone, role, active, location, branch } = await request.json()
+    const { name, email, phone, role, active, location, branch } = await request.json()
 
     // Get existing user to check for changes
     const existingUser = await prisma.user.findUnique({ where: { id } })
@@ -25,11 +25,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+    const normalizedEmail = email ? email.toLowerCase().trim() : undefined
+    if (normalizedEmail && normalizedEmail !== existingUser.email) {
+      const emailExists = await prisma.user.findUnique({
+        where: { email: normalizedEmail }
+      })
+      if (emailExists) {
+        return NextResponse.json({ error: "Email already in use by another user" }, { status: 400 })
+      }
+    }
+
     const nameChanged = name !== undefined && name !== existingUser.name
 
     const user = await prisma.user.update({
       where: { id },
-      data: { name, phone, role, active, location, branch },
+      data: { name, email: normalizedEmail, phone, role, active, location, branch },
     })
 
     if (nameChanged) {

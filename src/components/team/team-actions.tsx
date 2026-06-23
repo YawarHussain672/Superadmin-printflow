@@ -142,7 +142,7 @@ export function TeamActions({ mode, member, onSuccess, onDelete }: TeamActionsPr
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     name: member?.name || "",
-    email: "",
+    email: member?.email || "",
     phone: member?.phone || "",
     role: member?.role || "POC",
     password: "",
@@ -151,12 +151,27 @@ export function TeamActions({ mode, member, onSuccess, onDelete }: TeamActionsPr
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
+  // Sync form state when modal opens or member prop changes
+  useEffect(() => {
+    if (open && member) {
+      setForm({
+        name: member.name || "",
+        email: member.email || "",
+        phone: member.phone || "",
+        role: member.role || "POC",
+        password: "",
+        location: member.location || "",
+        branch: member.branch || "",
+      })
+    }
+  }, [open, member])
+
   const handleSave = async () => {
     setLoading(true)
     try {
       const url = mode === "add" ? "/api/team" : `/api/team/${member!.id}`
       const method = mode === "add" ? "POST" : "PUT"
-      const body = mode === "add" ? form : { name: form.name, phone: form.phone, role: form.role, location: form.location, branch: form.branch }
+      const body = mode === "add" ? form : { name: form.name, email: form.email, phone: form.phone, role: form.role, location: form.location, branch: form.branch }
 
       const res = await fetch(url, {
         method,
@@ -396,6 +411,16 @@ export function TeamActions({ mode, member, onSuccess, onDelete }: TeamActionsPr
                 className="form-input"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input
+                type="email"
+                className="form-input"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
               />
             </div>
             <div className="form-group">
