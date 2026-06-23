@@ -39,6 +39,12 @@ const TruckIcon = () => (
   </svg>
 )
 
+const PendingIcon = () => (
+  <svg className="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+)
+
 const PlusIcon = () => (
   <svg className="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -119,6 +125,10 @@ export function SuperAdminSidebar({ user }: SuperAdminSidebarProps) {
           <Link href="/superadmin/dispatch" className={`nav-item ${isActive("/superadmin/dispatch") ? "active" : ""}`}>
             <TruckIcon />
             Dispatch & Tracking
+          </Link>
+          <Link href="/superadmin/pending-pi-po" className={`nav-item ${isActive("/superadmin/pending-pi-po") ? "active" : ""}`}>
+            <PendingIcon />
+            Pending PI/PO
           </Link>
         </div>
 

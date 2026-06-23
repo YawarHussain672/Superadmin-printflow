@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     let targetUserId: string | undefined = undefined
     let targetUserEmail: string | undefined = undefined
     let targetPocEmail: string | undefined = undefined
+    let targetClientId: string | undefined = undefined
     let isCron = false
 
     let reminderType: "PI" | "PO" | "BOTH" = "BOTH"
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Check session
       session = await getServerSession(authOptions)
-      if (!session || session.user.role !== "ADMIN") {
+      if (!session || (session.user.role !== "ADMIN" && session.user.role !== "SUPERADMIN")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       }
     }
@@ -43,6 +44,9 @@ export async function POST(request: NextRequest) {
         targetPocEmail = body.pocEmail
         if (body.reminderType === "PI" || body.reminderType === "PO" || body.reminderType === "BOTH") {
           reminderType = body.reminderType
+        }
+        if (body.clientId) {
+          targetClientId = body.clientId
         }
       }
     } catch {
@@ -78,6 +82,20 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // Run globally for all active clients
+        clientsToProcess = await prisma.client.findMany({
+          where: { isActive: true },
+          select: { id: true, companyName: true }
+        })
+      }
+    } else if (session?.user.role === "SUPERADMIN") {
+      // Superadmin can filter to a specific organization or process all
+      if (targetClientId) {
+        const client = await prisma.client.findUnique({
+          where: { id: targetClientId },
+          select: { id: true, companyName: true }
+        })
+        if (client) clientsToProcess.push(client)
+      } else {
         clientsToProcess = await prisma.client.findMany({
           where: { isActive: true },
           select: { id: true, companyName: true }
