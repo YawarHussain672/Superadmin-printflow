@@ -209,6 +209,15 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // Get all active tenant admins for this client/tenant organization
+      const tenantAdmins = await prisma.user.findMany({
+        where: {
+          clientId: client.id,
+          role: "ADMIN",
+          active: true
+        }
+      })
+
       // Process pending PIs
       for (const p of pendingPiProjects) {
         let detail = "PI Not Generated"
@@ -221,6 +230,11 @@ export async function POST(request: NextRequest) {
         if (p.poc) {
           addProjectToUser(p.poc, p, "PI", detail)
         }
+        
+        // Add to all tenant admins
+        for (const admin of tenantAdmins) {
+          addProjectToUser(admin, p, "PI", detail)
+        }
       }
 
       // Process pending POs
@@ -232,6 +246,11 @@ export async function POST(request: NextRequest) {
         }
         if (p.client) {
           addProjectToUser(p.client, p, "PO", detail)
+        }
+        
+        // Add to all tenant admins
+        for (const admin of tenantAdmins) {
+          addProjectToUser(admin, p, "PO", detail)
         }
       }
 
