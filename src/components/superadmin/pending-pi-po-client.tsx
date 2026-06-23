@@ -490,7 +490,7 @@ export function SuperAdminPendingPiPoClient({
       )}
 
       {/* Control Card with Tabs and Search */}
-      <div className="card" style={{ minWidth: activeTab === "settings" ? "100%" : "1150px", width: "100%", marginBottom: "24px" }}>
+      <div className="card" style={{ width: "100%", marginBottom: "24px" }}>
         <div
           style={{
             padding: "16px 20px",
@@ -632,19 +632,19 @@ export function SuperAdminPendingPiPoClient({
                     Target Organization:
                   </label>
                   <select
-                    className="form-select"
-                    value={settingsOrgId}
-                    onChange={(e) => {
-                      setSettingsOrgId(e.target.value)
-                      setReminderPocEmail("")
-                    }}
-                    style={{ padding: "8px 12px" }}
-                  >
-                    <option value="">-- Choose Organization --</option>
-                    {organizations.map((org) => (
-                      <option key={org.id} value={org.id}>{org.companyName}</option>
-                    ))}
-                  </select>
+                     className="form-select"
+                     value={settingsOrgId}
+                     onChange={(e) => {
+                       setSettingsOrgId(e.target.value)
+                       setReminderPocEmail("")
+                     }}
+                     style={{ padding: "8px 12px" }}
+                   >
+                     <option value="">-- Choose Organization --</option>
+                     {organizations.map((org) => (
+                       <option key={org.id} value={org.id}>{org.companyName}</option>
+                     ))}
+                   </select>
                 </div>
 
                 {settingsOrgId && (
@@ -811,12 +811,9 @@ export function SuperAdminPendingPiPoClient({
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Org</th>
-                    <th>Project ID</th>
-                    <th>Project Name</th>
+                    <th>Project Details</th>
                     <th>Assigned To</th>
-                    <th>Location</th>
-                    <th>Delivery Date</th>
+                    <th>Location & Date</th>
                     <th>PI Details</th>
                     <th>Total Amount</th>
                     <th style={{ width: "260px" }}>Actions</th>
@@ -833,16 +830,18 @@ export function SuperAdminPendingPiPoClient({
 
                     return (
                       <tr key={project.id} onClick={() => router.push(`/superadmin/projects/${project.id}`)} style={{ cursor: "pointer", transition: "background-color 0.2s" }} className="hover:bg-gray-50">
-                        <td style={{ fontWeight: 600, color: "var(--axis-primary)" }}>
-                          {project.tenantClient?.companyName || "—"}
-                        </td>
-                        <td className="project-id">
-                          <Link href={`/superadmin/projects/${project.id}`}>{project.projectId}</Link>
-                        </td>
                         <td>
-                          <Link href={`/superadmin/projects/${project.id}`} style={{ fontWeight: 700, color: "var(--gray-900)" }}>
-                            {project.name}
-                          </Link>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--axis-accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              {project.tenantClient?.companyName || "—"}
+                            </span>
+                            <span className="project-id" style={{ fontSize: "12px", fontFamily: "monospace" }}>
+                              <Link href={`/superadmin/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>{project.projectId}</Link>
+                            </span>
+                            <span style={{ fontWeight: 600, color: "var(--gray-900)" }}>
+                              <Link href={`/superadmin/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>{project.name}</Link>
+                            </span>
+                          </div>
                         </td>
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -855,10 +854,16 @@ export function SuperAdminPendingPiPoClient({
                           </div>
                         </td>
                         <td>
-                          {project.location}
-                          {project.branch ? ` (${project.branch})` : ""}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <span style={{ fontSize: "13px", fontWeight: 500 }}>
+                              {project.location}
+                              {project.branch ? ` (${project.branch})` : ""}
+                            </span>
+                            <span style={{ fontSize: "11px", color: "var(--gray-500)" }}>
+                              Due: {formatDate(project.deliveryDate)}
+                            </span>
+                          </div>
                         </td>
-                        <td>{formatDate(project.deliveryDate)}</td>
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                             {project.piNumber ? (
@@ -1009,12 +1014,9 @@ export function SuperAdminPendingPiPoClient({
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Org</th>
-                  <th>Project ID</th>
-                  <th>Project Name</th>
+                  <th>Project Details</th>
                   <th>Assigned To</th>
-                  <th>Location</th>
-                  <th>Delivery Date</th>
+                  <th>Location & Date</th>
                   <th>PI Number</th>
                   <th>Total Amount</th>
                   <th style={{ width: "280px" }}>Actions / PO Upload</th>
@@ -1031,16 +1033,18 @@ export function SuperAdminPendingPiPoClient({
 
                   return (
                     <tr key={project.id} onClick={() => router.push(`/superadmin/projects/${project.id}`)} style={{ cursor: "pointer", transition: "background-color 0.2s" }} className="hover:bg-gray-50">
-                      <td style={{ fontWeight: 600, color: "var(--axis-primary)" }}>
-                        {project.tenantClient?.companyName || "—"}
-                      </td>
-                      <td className="project-id">
-                        <Link href={`/superadmin/projects/${project.id}`}>{project.projectId}</Link>
-                      </td>
                       <td>
-                        <Link href={`/superadmin/projects/${project.id}`} style={{ fontWeight: 700, color: "var(--gray-900)" }}>
-                          {project.name}
-                        </Link>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--axis-accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            {project.tenantClient?.companyName || "—"}
+                          </span>
+                          <span className="project-id" style={{ fontSize: "12px", fontFamily: "monospace" }}>
+                            <Link href={`/superadmin/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>{project.projectId}</Link>
+                          </span>
+                          <span style={{ fontWeight: 600, color: "var(--gray-900)" }}>
+                            <Link href={`/superadmin/projects/${project.id}`} onClick={(e) => e.stopPropagation()}>{project.name}</Link>
+                          </span>
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -1053,10 +1057,16 @@ export function SuperAdminPendingPiPoClient({
                         </div>
                       </td>
                       <td>
-                        {project.location}
-                        {project.branch ? ` (${project.branch})` : ""}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <span style={{ fontSize: "13px", fontWeight: 500 }}>
+                            {project.location}
+                            {project.branch ? ` (${project.branch})` : ""}
+                          </span>
+                          <span style={{ fontSize: "11px", color: "var(--gray-500)" }}>
+                            Due: {formatDate(project.deliveryDate)}
+                          </span>
+                        </div>
                       </td>
-                      <td>{formatDate(project.deliveryDate)}</td>
                       <td className="font-mono">{project.piNumber || "—"}</td>
                       <td className="font-mono">
                         <div style={{ display: "flex", flexDirection: "column" }}>
