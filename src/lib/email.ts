@@ -555,3 +555,103 @@ export async function sendTenantDeactivatedEmail(to: string, data: {
       <p style="color:#475569;margin:0 0 20px">Your users will no longer be able to log in or access the system resources. Please contact Rishiraj Media support if you believe this is an error or to reactivate your subscription.</p>
     `))
 }
+
+export async function sendOrgAdminSummaryEmail(to: string, data: {
+  adminName: string
+  companyName: string
+  pendingPi: any[]
+  pendingPo: any[]
+  appUrl: string
+}) {
+  const title = `Pending PI/PO Summary - ${data.companyName}`
+  const subject = `Attention Required: Pending PI/PO Summary - ${data.companyName}`
+
+  const piRows = data.pendingPi.length > 0 ? data.pendingPi.map((p) => {
+    const formattedTotal = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 2
+    }).format(p.grandTotal)
+
+    return `
+      <tr style="border-bottom:1px solid #cbd5e1">
+        <td style="padding:10px 8px;font-family:monospace;font-size:12px;font-weight:700;color:#003c71">${p.projectId}</td>
+        <td style="padding:10px 8px;font-size:13px;color:#0f172a;font-weight:600">${p.name}</td>
+        <td style="padding:10px 8px;font-size:12px;color:#475569">${p.pocName || "—"}</td>
+        <td style="padding:10px 8px;font-size:12px;color:#475569">${p.clientName || "—"}</td>
+        <td style="padding:10px 8px;font-size:12px;color:#9a3412;font-weight:600;background-color:#fff7ed">${p.detail}</td>
+        <td style="padding:10px 8px;font-size:13px;font-family:monospace;color:#0f172a;font-weight:700;text-align:right">${formattedTotal}</td>
+      </tr>
+    `
+  }).join("") : `<tr><td colspan="6" style="padding:16px;text-align:center;color:#64748b;font-size:13px">No pending Proforma Invoices</td></tr>`
+
+  const poRows = data.pendingPo.length > 0 ? data.pendingPo.map((p) => {
+    const formattedTotal = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 2
+    }).format(p.grandTotal)
+
+    return `
+      <tr style="border-bottom:1px solid #cbd5e1">
+        <td style="padding:10px 8px;font-family:monospace;font-size:12px;font-weight:700;color:#003c71">${p.projectId}</td>
+        <td style="padding:10px 8px;font-size:13px;color:#0f172a;font-weight:600">${p.name}</td>
+        <td style="padding:10px 8px;font-size:12px;color:#475569">${p.pocName || "—"}</td>
+        <td style="padding:10px 8px;font-size:12px;color:#475569">${p.clientName || "—"}</td>
+        <td style="padding:10px 8px;font-size:12px;color:#047857;font-weight:600;background-color:#ecfdf5">${p.piNumber || "Verified"}</td>
+        <td style="padding:10px 8px;font-size:13px;font-family:monospace;color:#0f172a;font-weight:700;text-align:right">${formattedTotal}</td>
+      </tr>
+    `
+  }).join("") : `<tr><td colspan="6" style="padding:16px;text-align:center;color:#64748b;font-size:13px">No pending Purchase Orders</td></tr>`
+
+  const emailHtml = baseTemplate(title, `
+    <p style="color:#475569;margin:0 0 20px">Dear ${data.adminName},</p>
+    <p style="color:#475569;margin:0 0 20px">Please find below a consolidated summary of outstanding Proforma Invoice (PI) and Purchase Order (PO) actions for your organization, <strong>${data.companyName}</strong>.</p>
+    
+    <h3 style="color:#0f172a;font-size:15px;margin:24px 0 12px;border-bottom:2px solid #003c71;padding-bottom:6px">Pending Proforma Invoices (PI)</h3>
+    <div style="overflow-x:auto;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;text-align:left">
+        <thead>
+          <tr style="border-bottom:2px solid #cbd5e1;background-color:#f8fafc">
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">ID</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">Project Name</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">POC</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">Client</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">Status</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${piRows}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="color:#0f172a;font-size:15px;margin:24px 0 12px;border-bottom:2px solid #003c71;padding-bottom:6px">Pending Purchase Orders (PO)</h3>
+    <div style="overflow-x:auto;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse;text-align:left">
+        <thead>
+          <tr style="border-bottom:2px solid #cbd5e1;background-color:#f8fafc">
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">ID</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">Project Name</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">POC</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">Client</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase">PI Number</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${poRows}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-bottom:24px">
+      ${button("View Pending Items Dashboard", `${data.appUrl}/pending-pi-po`, "#003c71")}
+    </div>
+    
+    <p style="color:#64748b;font-size:12px;margin:0">Please coordinate with the respective Points of Contact (POCs) or Client users to resolve these pending actions.</p>
+  `)
+
+  await sendMail(to, subject, emailHtml)
+}

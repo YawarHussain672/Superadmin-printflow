@@ -92,6 +92,7 @@ export function SuperAdminPendingPiPoClient({
   const [reminderPocEmail, setReminderPocEmail] = useState("")
   const [selectedReminderType, setSelectedReminderType] = useState<"BOTH" | "PI" | "PO">("BOTH")
   const [sendingDirectReminder, setSendingDirectReminder] = useState(false)
+  const [sendingOrgAdminSummary, setSendingOrgAdminSummary] = useState(false)
 
   // Global reminder actions
   const [sendingAllPiReminders, setSendingAllPiReminders] = useState(false)
@@ -288,6 +289,34 @@ export function SuperAdminPendingPiPoClient({
       toast.error("Network error. Please try again.")
     } finally {
       setSendingDirectReminder(false)
+    }
+  }
+
+  // Send summary digest to organization administrators
+  const handleSendOrgAdminSummary = async () => {
+    if (!settingsOrgId) return
+    setSendingOrgAdminSummary(true)
+    try {
+      const res = await fetch("/api/cron/send-pi-po-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: settingsOrgId,
+          sendToAdminSummary: true,
+          force: true
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(data.message || "Summary email sent to organization administrators.")
+      } else {
+        toast.error(data.error || "Failed to send summary email.")
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error("Network error. Please try again.")
+    } finally {
+      setSendingOrgAdminSummary(false)
     }
   }
 
@@ -795,6 +824,42 @@ export function SuperAdminPendingPiPoClient({
                           </button>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Send Digest Summary to Org Admins */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: "1px solid var(--gray-200)", paddingTop: "20px", maxWidth: "400px" }}>
+                      <div>
+                        <label style={{ fontWeight: 700, fontSize: "14px", color: "var(--gray-900)", display: "block", marginBottom: "4px" }}>
+                          Send Organization Admin Summary
+                        </label>
+                        <span style={{ fontSize: "12px", color: "var(--gray-500)", lineHeight: "1.4" }}>
+                          Send a consolidated summary of all pending PIs & POs (showing assigned POCs and Clients) directly to the administrators of this organization.
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleSendOrgAdminSummary}
+                        disabled={sendingOrgAdminSummary}
+                        className="btn btn-primary"
+                        style={{
+                          background: "var(--axis-accent)",
+                          color: "white",
+                          height: "38px",
+                          padding: "0 16px",
+                          width: "fit-content",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        {sendingOrgAdminSummary ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <svg style={{ width: "16px", height: "16px" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                        Send Admin Summary Email
+                      </button>
                     </div>
                   </>
                 )}

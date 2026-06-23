@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { basePrisma as prisma } from "@/lib/prisma" // Use basePrisma to query across tenants for cron, but we explicitly scope filters
-import { sendPendingPiPoReminderEmail, PendingReminderProject } from "@/lib/email"
+import { sendPendingPiPoReminderEmail, sendOrgAdminSummaryEmail, PendingReminderProject } from "@/lib/email"
 
 const APP_URL = process.env.NEXTAUTH_URL || "http://localhost:3000"
 
@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     let targetUserEmail: string | undefined = undefined
     let targetPocEmail: string | undefined = undefined
     let targetClientId: string | undefined = undefined
+    let sendToAdminSummary = false
     let isCron = false
 
     let reminderType: "PI" | "PO" | "BOTH" = "BOTH"
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
         targetUserId = body.userId
         targetUserEmail = body.userEmail
         targetPocEmail = body.pocEmail
+        sendToAdminSummary = !!body.sendToAdminSummary
         if (body.reminderType === "PI" || body.reminderType === "PO" || body.reminderType === "BOTH") {
           reminderType = body.reminderType
         }
@@ -108,6 +110,129 @@ export async function POST(request: NextRequest) {
         select: { id: true, companyName: true }
       })
       if (client) clientsToProcess.push(client)
+    }
+
+    // Handle Admin Summary Report request
+    if (sendToAdminSummary) {
+      if (!targetClientId) {
+        return NextResponse.json({ error: "clientId is required for Admin Summary Digest" }, { status: 400 })
+      }
+      
+      const client = await prisma.client.findUnique({
+        where: { id: targetClientId },
+        select: { id: true, companyName: true, clientEmail: true }
+      })
+      if (!client) {
+        return NextResponse.json({ error: "Organization not found" }, { status: 404 })
+      }
+
+      // Query pending PIs for this client
+      const pendingPiProjects = await prisma.project.findMany({
+        where: {
+          tenantClientId: client.id,
+          status: { not: "CANCELLED" },
+          OR: [
+            { piStatus: "PENDING" },
+            { piStatus: "REJECTED" },
+            { piStatus: null, piNumber: null },
+          ]
+        },
+        include: {
+          poc: true,
+          client: true
+        }
+      })
+
+      // Query pending POs for this client
+      const pendingPoProjects = await prisma.project.findMany({
+        where: {
+          tenantClientId: client.id,
+          piStatus: "VERIFIED",
+          files: { none: { type: "PO" } }
+        },
+        include: {
+          poc: true,
+          client: true
+        }
+      })
+
+      if (pendingPiProjects.length === 0 && pendingPoProjects.length === 0) {
+        return NextResponse.json({
+          success: true,
+          emailsSent: 0,
+          message: "No pending PI or PO items found for this organization."
+        })
+      }
+
+      // Get all active tenant admins for this client
+      const tenantAdmins = await prisma.user.findMany({
+        where: {
+          clientId: client.id,
+          role: "ADMIN",
+          active: true
+        }
+      })
+
+      const adminRecipients: { name: string; email: string }[] = tenantAdmins.map(u => ({ name: u.name, email: u.email }))
+      if (adminRecipients.length === 0 && client.clientEmail) {
+        adminRecipients.push({ name: "Administrator", email: client.clientEmail })
+      }
+
+      if (adminRecipients.length === 0) {
+        return NextResponse.json({ error: "No administrator email found for this organization" }, { status: 400 })
+      }
+
+      const formattedPi = pendingPiProjects.map(p => {
+        let detail = "PI Not Generated"
+        if (p.piStatus === "PENDING") detail = "Pending Admin Verification"
+        else if (p.piStatus === "REJECTED") detail = "PI Rejected (Requires Action)"
+        
+        return {
+          id: p.id,
+          projectId: p.projectId,
+          name: p.name,
+          pocName: p.poc?.name || p.pocName || "—",
+          clientName: p.client?.name || p.clientName || "—",
+          detail,
+          grandTotal: p.grandTotal || p.totalCost
+        }
+      })
+
+      const formattedPo = pendingPoProjects.map(p => ({
+        id: p.id,
+        projectId: p.projectId,
+        name: p.name,
+        pocName: p.poc?.name || p.pocName || "—",
+        clientName: p.client?.name || p.clientName || "—",
+        piNumber: p.piNumber || "Verified",
+        grandTotal: p.grandTotal || p.totalCost
+      }))
+
+      let sentCount = 0
+      const sendErrors: string[] = []
+
+      for (const recipient of adminRecipients) {
+        try {
+          await sendOrgAdminSummaryEmail(recipient.email, {
+            adminName: recipient.name,
+            companyName: client.companyName,
+            pendingPi: formattedPi,
+            pendingPo: formattedPo,
+            appUrl: APP_URL
+          })
+          sentCount++
+        } catch (err: any) {
+          console.error(`Error sending admin summary to ${recipient.email}:`, err)
+          sendErrors.push(`${recipient.email}: ${err.message}`)
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        emailsSent: sentCount,
+        errors: sendErrors.length > 0 ? sendErrors : undefined,
+        message: `Successfully sent ${sentCount} summary email(s) to organization administrators.`
+      })
     }
 
     let totalEmailsSent = 0
