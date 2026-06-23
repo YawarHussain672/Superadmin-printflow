@@ -122,13 +122,13 @@ export function SuperAdminSidebar({ user }: SuperAdminSidebarProps) {
             <CheckIcon />
             Approvals
           </Link>
-          <Link href="/superadmin/dispatch" className={`nav-item ${isActive("/superadmin/dispatch") ? "active" : ""}`}>
-            <TruckIcon />
-            Dispatch & Tracking
-          </Link>
           <Link href="/superadmin/pending-pi-po" className={`nav-item ${isActive("/superadmin/pending-pi-po") ? "active" : ""}`}>
             <PendingIcon />
             Pending PI/PO
+          </Link>
+          <Link href="/superadmin/dispatch" className={`nav-item ${isActive("/superadmin/dispatch") ? "active" : ""}`}>
+            <TruckIcon />
+            Dispatch & Tracking
           </Link>
         </div>
 
