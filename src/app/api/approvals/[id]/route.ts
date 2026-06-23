@@ -89,25 +89,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Database transaction failed", details: txError instanceof Error ? txError.message : String(txError) }, { status: 500 })
       }
 
-      // Send approval email + in-app notification to POC (if POC still exists)
-      if (approval.project.poc) {
-        try {
-          await sendProjectApprovedEmail(approval.project.poc.email, {
-            pocName: approval.project.poc.name,
-            projectName: approval.project.name,
-            projectId: approval.project.projectId,
-            location: approval.project.location,
-            totalCost: formatCurrency(approval.project.grandTotal),
-            appUrl: APP_URL,
-          })
-        } catch (emailError) {
-          console.error("[EMAIL ERROR] Failed to send project approved email:", emailError)
-        }
-
-        // In-app notification
-        await notifyProjectApproved(approval.projectId, approval.project.poc.id, approval.project.name, approval.project.projectId)
-      }
-
       // Audit log
       await logActivity({
         userId: session.user.id,
