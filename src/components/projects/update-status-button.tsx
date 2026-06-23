@@ -38,9 +38,6 @@ export function UpdateStatusButton({ projectId, currentStatus, piStatus }: Updat
   const [note, setNote] = useState("")
 
   let availableStatuses = statusFlow[currentStatus] || []
-  if (currentStatus === "APPROVED" && piStatus !== "VERIFIED") {
-    availableStatuses = availableStatuses.filter((status) => status !== "PRINTING")
-  }
 
   const handleUpdate = async () => {
     if (!selectedStatus) {

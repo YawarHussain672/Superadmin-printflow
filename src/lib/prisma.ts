@@ -21,7 +21,7 @@ export const prisma = basePrisma.$extends({
       async $allOperations({ model, operation, args, query }) {
         const modelsWithClientId = [
           'User', 'Project', 'RateCard', 'Approval', 'Dispatch',
-          'Notification', 'Activity', 'StatusHistory'
+          'Notification', 'Activity', 'StatusHistory', 'SystemSetting'
         ]
 
         if (modelsWithClientId.includes(model)) {

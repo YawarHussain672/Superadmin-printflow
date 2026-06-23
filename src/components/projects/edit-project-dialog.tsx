@@ -23,6 +23,8 @@ interface Project {
   quantity?: number
   packingCharges?: number | null
   packingChargesGstRate?: number | null
+  deliveryCharges?: number | null
+  deliveryChargesGstRate?: number | null
   collaterals?: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
   dispatch?: {
     courier: string
@@ -128,8 +130,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   const [newItemSpecification, setNewItemSpecification] = useState("")
   const [totalCost, setTotalCost] = useState(0)
   const [packingCharges, setPackingCharges] = useState(0)
-  const [packingChargesGstRate, setPackingChargesGstRate] = useState(18)
+  const [packingChargesGstRate, setPackingChargesGstRate] = useState<number | "">(18)
   const [showPackingForm, setShowPackingForm] = useState(false)
+  const [deliveryCharges, setDeliveryCharges] = useState(0)
+  const [deliveryChargesGstRate, setDeliveryChargesGstRate] = useState<number | "">(18)
+  const [showDeliveryForm, setShowDeliveryForm] = useState(false)
 
   const today = new Date().toISOString().split("T")[0]
 
@@ -274,13 +279,18 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           }) || []
         setCollaterals(loadedCollaterals)
 
-        // Load packing charges from project
+        // Load packing and delivery charges from project
         const loadedPackingCharges = project.packingCharges || 0
         const loadedPackingGstRate = project.packingChargesGstRate ?? 18
         setPackingCharges(loadedPackingCharges)
         setPackingChargesGstRate(loadedPackingGstRate)
 
-        updateTotalCost(loadedCollaterals, loadedPackingCharges)
+        const loadedDeliveryCharges = project.deliveryCharges || 0
+        const loadedDeliveryGstRate = project.deliveryChargesGstRate ?? 18
+        setDeliveryCharges(loadedDeliveryCharges)
+        setDeliveryChargesGstRate(loadedDeliveryGstRate)
+
+        updateTotalCost(loadedCollaterals, loadedPackingCharges, loadedDeliveryCharges)
         setLoadedProjectId(project.id)
       } catch {
         toast.error("Failed to load form data")
@@ -393,11 +403,12 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     return getUnitPriceFromRateCardWithData(itemName, quantity, rateCardItems)
   }
 
-  // Update total cost based on all collaterals and packing charges
-  function updateTotalCost(items: CollateralWithPrice[], packing?: number) {
+  // Update total cost based on all collaterals, packing charges, and delivery charges
+  function updateTotalCost(items: CollateralWithPrice[], packing?: number, delivery?: number) {
     const itemsTotal = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
     const packingTotal = packing !== undefined ? packing : packingCharges
-    setTotalCost(itemsTotal + packingTotal)
+    const deliveryTotal = delivery !== undefined ? delivery : deliveryCharges
+    setTotalCost(itemsTotal + packingTotal + deliveryTotal)
   }
 
   // Update collateral quantity and recalculate price
@@ -460,8 +471,9 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     (sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))),
     0
   )
-  const packingGstAmount = packingCharges * (packingChargesGstRate / 100)
-  const totalGstAmount = itemGstAmount + packingGstAmount
+  const packingGstAmount = packingCharges * ((packingChargesGstRate === "" ? 18 : packingChargesGstRate) / 100)
+  const deliveryGstAmount = deliveryCharges * ((deliveryChargesGstRate === "" ? 18 : deliveryChargesGstRate) / 100)
+  const totalGstAmount = itemGstAmount + packingGstAmount + deliveryGstAmount
   const grandTotalAmount = totalCost + totalGstAmount
   const uniqueItemGstRates = [...new Set(collaterals.filter(c => c.itemName).map(c => `${c.gstRate ?? 18}%`))]
 
@@ -508,7 +520,10 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           })),
           // Packing charges
           packingCharges,
-          packingChargesGstRate,
+          packingChargesGstRate: packingChargesGstRate === "" ? 18 : packingChargesGstRate,
+          // Delivery charges
+          deliveryCharges,
+          deliveryChargesGstRate: deliveryChargesGstRate === "" ? 18 : deliveryChargesGstRate,
           // Courier with "Not assigned" option (matching HTML reference)
           ...(formData.courier && formData.courier !== "-" ? {
             dispatch: {
@@ -538,8 +553,12 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
             item.specification !== updatedCollaterals[index]?.specification
           )
 
+        const resolvedPackingGstRate = packingChargesGstRate === "" ? 18 : packingChargesGstRate
         const packingChanged = packingCharges !== (project.packingCharges || 0) ||
-          packingChargesGstRate !== (project.packingChargesGstRate ?? 18)
+          resolvedPackingGstRate !== (project.packingChargesGstRate ?? 18)
+        const resolvedDeliveryGstRate = deliveryChargesGstRate === "" ? 18 : deliveryChargesGstRate
+        const deliveryChanged = deliveryCharges !== (project.deliveryCharges || 0) ||
+          resolvedDeliveryGstRate !== (project.deliveryChargesGstRate ?? 18)
 
         const recipientNameChanged = (formData.recipientName || "") !== (project.recipientName || "")
         const recipientContactChanged = (formData.recipientContact || "") !== (project.recipientContact || "")
@@ -563,6 +582,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           deliveryDateChanged ||
           collateralsChanged ||
           packingChanged ||
+          deliveryChanged ||
           recipientChanged
 
         const shouldRegeneratePI = Boolean(project.piNumber && anyFormChanged)
@@ -751,15 +771,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                     onChange={(e) => { setFormData({ ...formData, status: e.target.value }); setErrors({ ...errors, status: "" }) }}
                     style={errors.status ? { borderColor: '#ef4444' } : {}}
                   >
-                    {PROJECT_STATUSES.filter((s) => {
-                      if (s.value === "printing") {
-                        const isCurrentlyPrintingOrLater = ["printing", "dispatched", "delivered"].includes(project?.status?.toLowerCase() || "");
-                        if (!isCurrentlyPrintingOrLater && project?.piStatus !== "VERIFIED") {
-                          return false;
-                        }
-                      }
-                      return true;
-                    }).map((s) => (
+                    {PROJECT_STATUSES.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
@@ -892,6 +904,31 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                           </svg>
                           {packingCharges > 0 ? `Packing ₹${packingCharges}` : 'Add Packing'}
+                        </button>
+                      )}
+                      {!showDeliveryForm && (
+                        <button
+                          type="button"
+                          onClick={() => setShowDeliveryForm(true)}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#0ea5e9',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 001-1v-4h3m4 4h.01M21 16v-2a2 2 0 00-2-2h-3V7a1 1 0 00-1-1H13" />
+                          </svg>
+                          {deliveryCharges > 0 ? `Delivery ₹${deliveryCharges}` : 'Add Delivery'}
                         </button>
                       )}
                     </div>
@@ -1113,7 +1150,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0
                           setPackingCharges(val)
-                          updateTotalCost(collaterals, val)
+                          updateTotalCost(collaterals, val, deliveryCharges)
                         }}
                         placeholder="Packing amount"
                         min="0"
@@ -1122,12 +1159,17 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                       <input
                         type="number"
                         className="form-input"
-                        value={packingChargesGstRate ?? ''}
+                        value={packingChargesGstRate}
                         onChange={(e) => {
-                          const val = parseFloat(e.target.value)
-                          setPackingChargesGstRate(isNaN(val) ? 18 : val)
+                          const val = e.target.value
+                          if (val === "") {
+                            setPackingChargesGstRate("")
+                          } else {
+                            const parsed = parseFloat(val)
+                            setPackingChargesGstRate(isNaN(parsed) ? "" : parsed)
+                          }
                         }}
-                        placeholder="GST %"
+                        placeholder="18"
                         min="0"
                         max="100"
                         style={{ width: '80px', marginBottom: 0, height: '38px', textAlign: 'center' }}
@@ -1142,7 +1184,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                           } else {
                             setPackingCharges(0)
                             setPackingChargesGstRate(18)
-                            updateTotalCost(collaterals, 0)
+                            updateTotalCost(collaterals, 0, deliveryCharges)
                             setShowPackingForm(false)
                           }
                         }}
@@ -1165,7 +1207,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                           onClick={() => {
                             setPackingCharges(0)
                             setPackingChargesGstRate(18)
-                            updateTotalCost(collaterals, 0)
+                            updateTotalCost(collaterals, 0, deliveryCharges)
                             setShowPackingForm(false)
                           }}
                           style={{
@@ -1185,8 +1227,106 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                     </div>
                   )}
 
+                  {/* Delivery Charges Form */}
+                  {showDeliveryForm && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px',
+                        background: 'rgba(14, 165, 233, 0.05)',
+                        borderRadius: '8px',
+                        border: '1px dashed #0ea5e9',
+                        marginTop: '8px',
+                        marginBottom: '16px'
+                      }}
+                    >
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={deliveryCharges || ''}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0
+                          setDeliveryCharges(val)
+                          updateTotalCost(collaterals, packingCharges, val)
+                        }}
+                        placeholder="Delivery amount"
+                        min="0"
+                        style={{ flex: 1, marginBottom: 0, height: '38px' }}
+                      />
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={deliveryChargesGstRate}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === "") {
+                            setDeliveryChargesGstRate("")
+                          } else {
+                            const parsed = parseFloat(val)
+                            setDeliveryChargesGstRate(isNaN(parsed) ? "" : parsed)
+                          }
+                        }}
+                        placeholder="18"
+                        min="0"
+                        max="100"
+                        style={{ width: '80px', marginBottom: 0, height: '38px', textAlign: 'center' }}
+                      />
+                      <span style={{ fontSize: '13px', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>% GST</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (deliveryCharges > 0) {
+                            setShowDeliveryForm(false)
+                          } else {
+                            setDeliveryCharges(0)
+                            setDeliveryChargesGstRate(18)
+                            updateTotalCost(collaterals, packingCharges, 0)
+                            setShowDeliveryForm(false)
+                          }
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          background: deliveryCharges > 0 ? '#0ea5e9' : '#e5e7eb',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          color: deliveryCharges > 0 ? 'white' : '#9ca3af',
+                          fontWeight: 600,
+                          fontSize: '13px'
+                        }}
+                      >
+                        {deliveryCharges > 0 ? 'Done' : 'Cancel'}
+                      </button>
+                      {deliveryCharges > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeliveryCharges(0)
+                            setDeliveryChargesGstRate(18)
+                            updateTotalCost(collaterals, packingCharges, 0)
+                            setShowDeliveryForm(false)
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#fee2e2',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: '#dc2626',
+                            fontWeight: 600,
+                            fontSize: '13px'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Total Cost Display with GST */}
-                  {(collaterals.length > 0 || packingCharges > 0) && (
+                  {(collaterals.length > 0 || packingCharges > 0 || deliveryCharges > 0) && (
                     <div style={{
                       padding: '16px',
                       background: 'var(--gray-100)',
@@ -1209,6 +1349,14 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                         </div>
                       )}
 
+                      {/* Delivery Charges */}
+                      {deliveryCharges > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                          <span style={{ color: 'var(--gray-600)' }}>Delivery Charges:</span>
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>₹{deliveryCharges.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+
                       {/* Total Base Cost */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', background: 'rgba(0,0,0,0.02)', padding: '4px 0', margin: '4px 0' }}>
                         <span style={{ color: 'var(--gray-700)', fontWeight: 600 }}>Total Base Cost:</span>
@@ -1224,8 +1372,16 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                       {/* GST on Packing */}
                       {packingCharges > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                          <span style={{ color: 'var(--gray-600)' }}>GST on Packing ({packingChargesGstRate}%):</span>
+                          <span style={{ color: 'var(--gray-600)' }}>GST on Packing ({packingChargesGstRate === "" ? 18 : packingChargesGstRate}%):</span>
                           <span style={{ fontFamily: 'var(--font-mono)' }}>₹{packingGstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+
+                      {/* GST on Delivery */}
+                      {deliveryCharges > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                          <span style={{ color: 'var(--gray-600)' }}>GST on Delivery ({deliveryChargesGstRate === "" ? 18 : deliveryChargesGstRate}%):</span>
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>₹{deliveryGstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                       )}
 

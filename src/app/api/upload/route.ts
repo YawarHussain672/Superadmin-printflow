@@ -39,23 +39,17 @@ export async function POST(request: NextRequest) {
     const isAdmin = session.user.role === "ADMIN"
     const isOwner = project.pocId === session.user.id
     const projectApprovedByAdmin = project.approval?.status === "APPROVED" || !["REQUESTED", "CANCELLED"].includes(project.status)
-    const pocCanUpload = isOwner && projectApprovedByAdmin && project.piStatus === "VERIFIED"
+    const pocCanUpload = isOwner && projectApprovedByAdmin
 
     if (!isAdmin && !isOwner) {
       return NextResponse.json({ error: "You can only upload files to your own projects" }, { status: 403 })
     }
     if (!isAdmin && !pocCanUpload) {
-      return NextResponse.json({ error: "POCs can upload documents only after admin approves the project and verifies the PI" }, { status: 403 })
+      return NextResponse.json({ error: "POCs can upload documents only after admin approves the project" }, { status: 403 })
     }
 
-    if (fileType === "PO" && !["APPROVED", "PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status)) {
-      return NextResponse.json({ error: "PO can only be uploaded after project approval" }, { status: 400 })
-    }
-    if (fileType === "CHALLAN" && !["PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status)) {
-      return NextResponse.json({ error: "Challan can only be uploaded during printing, dispatch or delivery" }, { status: 400 })
-    }
-    if (fileType === "INVOICE" && !["DISPATCHED", "DELIVERED"].includes(project.status)) {
-      return NextResponse.json({ error: "Invoice can only be uploaded after dispatch" }, { status: 400 })
+    if (["PO", "CHALLAN", "INVOICE"].includes(fileType) && !["APPROVED", "PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status)) {
+      return NextResponse.json({ error: `${fileType} can only be uploaded after project approval` }, { status: 400 })
     }
 
     // Upload to S3

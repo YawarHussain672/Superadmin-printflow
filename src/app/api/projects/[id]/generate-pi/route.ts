@@ -90,6 +90,8 @@ export async function POST(
       totalCost: project.totalCost,
       packingCharges: project.packingCharges,
       packingChargesGstRate: project.packingChargesGstRate,
+      deliveryCharges: project.deliveryCharges,
+      deliveryChargesGstRate: project.deliveryChargesGstRate,
       pocName: project.poc?.name || project.pocName || undefined,
       pocEmail: project.poc?.email || undefined,
       clientName: project.client?.name || project.clientName || undefined,

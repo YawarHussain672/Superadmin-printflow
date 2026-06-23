@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import { openNewProjectModal } from "@/components/projects/new-project-modal"
+import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
 
 interface SidebarProps {
   user?: { name: string; email: string; role: string }
@@ -75,7 +76,7 @@ const LogoutIcon = () => (
 export function Sidebar({ user, isOpen = true }: SidebarProps) {
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [counts, setCounts] = useState({ totalProjects: 0, pendingApprovals: 0 })
+  const [counts, setCounts] = useState({ totalProjects: 0, pendingApprovals: 0, pendingPiPo: 0 })
   const [countsLoaded, setCountsLoaded] = useState(false)
 
   // Fetch real-time counts
@@ -94,8 +95,28 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
       }
     }
     fetchCounts()
+
+    // Set up Pusher subscriptions for real-time counts
+    const client = getPusherClient()
+    const targetChannels = [CHANNELS.PROJECTS, CHANNELS.APPROVALS, CHANNELS.DASHBOARD]
+    const subscriptions = targetChannels.map((chName) => {
+      const channel = client.subscribe(chName)
+      Object.values(EVENTS).forEach((event) => {
+        channel.bind(event, fetchCounts)
+      })
+      return channel
+    })
+
     const interval = setInterval(fetchCounts, 30000)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      subscriptions.forEach((channel) => {
+        Object.values(EVENTS).forEach((event) => {
+          channel.unbind(event, fetchCounts)
+        })
+        client.unsubscribe(channel.name)
+      })
+    }
   }, [])
 
   const isAdmin = user?.role === "ADMIN"
@@ -152,6 +173,15 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
               Approvals
               {countsLoaded && counts.pendingApprovals > 0 && (
                 <span className="nav-badge">{counts.pendingApprovals}</span>
+              )}
+            </Link>
+          )}
+          {(isAdmin || user?.role === "POC") && (
+            <Link href="/pending-pi-po" className={`nav-item ${isActive("/pending-pi-po") ? "active" : ""}`}>
+              <ReceiptIcon />
+              Pending PI/PO
+              {countsLoaded && counts.pendingPiPo > 0 && (
+                <span className="nav-badge">{counts.pendingPiPo}</span>
               )}
             </Link>
           )}

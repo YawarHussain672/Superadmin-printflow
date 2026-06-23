@@ -45,7 +45,8 @@ const XCircleIcon = () => (
 
 const RupeeIcon = () => (
   <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 8h6M9 11h6M9 14h2a3 3 0 0 0 0-6M9 14l5 5" />
   </svg>
 )
 
@@ -108,12 +109,22 @@ function StatCard({ label, value, icon, iconBg, iconColor, className = "" }: {
   iconColor: string
   className?: string
 }) {
+  const valueStr = String(value)
+  let fontSize = "32px"
+  if (valueStr.length > 10) {
+    fontSize = "18px"
+  } else if (valueStr.length > 8) {
+    fontSize = "22px"
+  } else if (valueStr.length > 6) {
+    fontSize = "26px"
+  }
+
   return (
     <div className={`stat-card ${className}`}>
       <div className="stat-header">
         <div>
           <div className="stat-label">{label}</div>
-          <div className="stat-value">{value}</div>
+          <div className="stat-value" style={{ fontSize, transition: 'font-size 0.2s' }}>{value}</div>
         </div>
         <div className="stat-icon" style={{ background: iconBg, color: iconColor }}>
           {icon}
@@ -196,7 +207,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           label={session?.user.role === "CLIENT" ? "My Spend (with GST)" : "Total Spend (with GST)"}
-          value={`₹${Math.round(stats.totalSpendWithGST / 1000)}K`}
+          value={`₹${Math.round(stats.totalSpendWithGST).toLocaleString('en-IN')}`}
           icon={<RupeeIcon />}
           iconBg="rgba(16, 185, 129, 0.1)"
           iconColor="var(--color-success)"
@@ -227,12 +238,17 @@ export default async function DashboardPage() {
             </thead>
             <tbody>
               {stats.recentProjects.map((project) => (
-                <tr key={project.id}>
-                  <td className="project-id">{project.projectId}</td>
-                  <td><strong>{project.name}</strong></td>
-                  <td>{project.location}{project.state ? `, ${project.state}` : ''}</td>
+                <tr key={project.id} style={{ position: 'relative' }}>
+                  <td>
+                    <Link href={`/projects/${project.id}`} style={{ position: 'absolute', inset: 0, zIndex: 1 }} aria-label={`View project ${project.name}`} />
+                    <span className="project-id" style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>{project.projectId}</span>
+                  </td>
+                  <td style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>
+                    <strong>{project.name}</strong>
+                  </td>
+                  <td style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>{project.location}{project.state ? `, ${project.state}` : ''}</td>
                   {session?.user.role !== "CLIENT" && (
-                    <td>
+                    <td style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {/* Line 1: POC */}
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
@@ -293,9 +309,9 @@ export default async function DashboardPage() {
                       </div>
                     </td>
                   )}
-                  <td><StatusBadge status={project.status} /></td>
-                  <td>{new Date(project.deliveryDate).toLocaleDateString('en-IN')}</td>
-                  <td className="font-mono">
+                  <td style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}><StatusBadge status={project.status} /></td>
+                  <td style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>{new Date(project.deliveryDate).toLocaleDateString('en-IN')}</td>
+                  <td className="font-mono" style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontWeight: 600 }}>₹{project.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>

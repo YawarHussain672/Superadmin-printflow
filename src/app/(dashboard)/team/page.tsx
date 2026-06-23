@@ -58,19 +58,16 @@ export default function TeamPage() {
   // Real-time update handlers
   const handleMemberAdded = (newMember: TeamMember) => {
     setMembers((prev) => [newMember, ...prev])
-    toast.success("Team member added successfully")
   }
 
   const handleMemberUpdated = (updatedMember: TeamMember) => {
     setMembers((prev) =>
       prev.map((m) => (m.id === updatedMember.id ? updatedMember : m))
     )
-    toast.success("Team member updated successfully")
   }
 
   const handleMemberDeleted = (memberId: string) => {
     setMembers((prev) => prev.filter((m) => m.id !== memberId))
-    toast.success("Team member deleted successfully")
   }
 
   if (status === "loading" || isLoading) {

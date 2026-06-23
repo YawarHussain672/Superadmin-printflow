@@ -30,6 +30,7 @@ model Client {
   notifications   Notification[]  @relation("ClientNotifications")
   activities      Activity[]      @relation("ClientActivities")
   statusHistories StatusHistory[] @relation("ClientStatusHistories")
+  settings        SystemSetting[] @relation("ClientSettings")
 
   @@map("clients")
 }
@@ -72,6 +73,8 @@ model User {
   clientId           String?
   client             Client?         @relation("ClientUsers", fields: [clientId], references: [id], onDelete: SetNull)
 
+  lastPiPoReminderSentAt DateTime?
+
   @@map("users")
 }
 
@@ -86,6 +89,7 @@ model Project {
   piGeneratedAt         DateTime?
   piVerifiedBy          String?
   piVerifiedAt          DateTime?
+  piRejectionNote       String?
   location              String
   state                 String?
   deliveryDate          DateTime
@@ -95,6 +99,8 @@ model Project {
   instructions          String?
   packingCharges        Float           @default(0)
   packingChargesGstRate Float           @default(18)
+  deliveryCharges       Float           @default(0)
+  deliveryChargesGstRate Float          @default(18)
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   pocId                 String?
@@ -311,4 +317,19 @@ enum FileType {
   CHALLAN
   INVOICE
   POD
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Multi-tenancy
+  clientId  String?
+  client    Client?  @relation("ClientSettings", fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, key])
+  @@map("system_settings")
 }

@@ -168,6 +168,17 @@ export function TeamActions({ mode, member, onSuccess, onDelete }: TeamActionsPr
         const result = await res.json()
         toast.success(mode === "add" ? "Team member added!" : "Member updated!")
         setOpen(false)
+        if (mode === "add") {
+          setForm({
+            name: "",
+            email: "",
+            phone: "",
+            role: "POC",
+            password: "",
+            location: "",
+            branch: "",
+          })
+        }
         onSuccess?.(result)
       } else {
         const text = await res.text()
@@ -229,10 +240,23 @@ export function TeamActions({ mode, member, onSuccess, onDelete }: TeamActionsPr
     }
   }
 
+  const handleOpenAdd = () => {
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+      role: "POC",
+      password: "",
+      location: "",
+      branch: "",
+    })
+    setOpen(true)
+  }
+
   if (mode === "add") {
     return (
       <>
-        <button className="btn btn-primary" onClick={() => setOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button className="btn btn-primary" onClick={handleOpenAdd} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <PlusIcon /> Add Team Member
         </button>
 

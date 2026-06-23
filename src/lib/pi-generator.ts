@@ -22,6 +22,8 @@ interface ProjectData {
   totalCost: number
   packingCharges: number
   packingChargesGstRate: number
+  deliveryCharges?: number | null
+  deliveryChargesGstRate?: number | null
   pocName?: string | null
   pocEmail?: string | null
   clientName?: string | null
@@ -84,42 +86,37 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === HEADER SECTION ===
 
-  let logoLoaded = false
+  // Add logo in top left (purple color) - smaller size
   try {
     const fs = await import('fs')
     const path = await import('path')
     const svgPath = path.join(process.cwd(), 'rm-white-logo3.svg')
-    const pngPath = path.join(process.cwd(), 'rm-white-logo3.png')
+    const pngPath = path.join(process.cwd(), 'rm-purple-logo.png')
 
-    if (fs.existsSync(pngPath)) {
-      fs.unlinkSync(pngPath)
-    }
-
-    if (fs.existsSync(svgPath)) {
-      await sharp(svgPath)
-        .resize(120, 60, { fit: 'inside', withoutEnlargement: true })
+    // Generate HQ PNG if it doesn't exist
+    if (!fs.existsSync(pngPath) && fs.existsSync(svgPath)) {
+      await sharp(svgPath, { density: 600 })
+        .resize({ width: 800 })
         .recomb([
-          [0.5, 0, 0.5],
+          [0.695, 0, 0],
           [0, 0, 0],
-          [0.5, 0, 0.5]
+          [0.695, 0, 0]
         ])
         .png()
         .toFile(pngPath)
+    }
 
+    if (fs.existsSync(pngPath)) {
       const logoData = fs.readFileSync(pngPath)
       const base64Image = logoData.toString('base64')
       doc.addImage(base64Image, 'PNG', 10, 3.9, 30, 15)
-      logoLoaded = true
     }
   } catch (error) {
-    console.error("Error loading default Rishiraj Media logo for PDF:", error)
-  }
-
-  if (!logoLoaded) {
+    // If logo processing fails, use purple text fallback
     doc.setFontSize(10)
     doc.setTextColor(128, 0, 128)
     doc.setFont("times", "bold")
-    doc.text(companyName.toUpperCase(), 12, 15)
+    doc.text("RISHIRAJ MEDIA", 12, 15)
     doc.setTextColor(0, 0, 0)
   }
 
@@ -316,17 +313,34 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
     ])
   }
 
+  const deliveryCharges = project.deliveryCharges || 0
+  if (deliveryCharges > 0) {
+    const deliveryRate = project.deliveryChargesGstRate ?? 18
+    tableData.push([
+      sNo++,
+      "Delivery Charges",
+      `${deliveryRate}%`,
+      1,
+      "Nos",
+      deliveryCharges.toFixed(2),
+      deliveryCharges.toFixed(2),
+    ])
+  }
+
   // Calculate totals using per-item GST rates
   const itemsSubtotal = project.collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
-  const packingSubtotal = project.packingCharges
-  const subtotal = itemsSubtotal + packingSubtotal
+  const packingSubtotal = project.packingCharges || 0
+  const deliverySubtotal = deliveryCharges
+  const subtotal = itemsSubtotal + packingSubtotal + deliverySubtotal
   const collateralsGst = project.collaterals.reduce((sum, c) => {
     const rate = c.gstRate ?? 18
     return sum + (c.totalPrice * (rate / 100))
   }, 0)
   const packingRate = project.packingChargesGstRate ?? 18
   const packingGst = packingSubtotal * (packingRate / 100)
-  const totalGst = collateralsGst + packingGst
+  const deliveryRate = project.deliveryChargesGstRate ?? 18
+  const deliveryGst = deliverySubtotal * (deliveryRate / 100)
+  const totalGst = collateralsGst + packingGst + deliveryGst
   const grandTotal = subtotal + totalGst
 
   // Draw Main Table

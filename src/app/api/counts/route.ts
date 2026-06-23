@@ -16,14 +16,45 @@ export async function GET() {
     const isPrivileged = isAdmin || isSuperAdmin
     const pocFilter = isPrivileged ? {} : { pocId: session.user.id }
 
-    const [totalProjects, pendingApprovals] = await Promise.all([
+    const [totalProjects, pendingApprovals, pendingPiCount, pendingPoCount] = await Promise.all([
       prisma.project.count({ where: pocFilter }),
       isPrivileged
         ? prisma.approval.count({ where: { status: "PENDING" } })
         : prisma.approval.count({ where: { status: "PENDING", requestedById: session.user.id } }),
+      isPrivileged
+        ? prisma.project.count({
+            where: {
+              status: { not: "CANCELLED" },
+              OR: [
+                { piStatus: "PENDING" },
+                { piStatus: "REJECTED" },
+                { piStatus: null, piNumber: null },
+              ],
+            },
+          })
+        : prisma.project.count({
+            where: {
+              pocId: session.user.id,
+              status: { not: "CANCELLED" },
+              OR: [
+                { piStatus: "PENDING" },
+                { piStatus: "REJECTED" },
+                { piStatus: null, piNumber: null },
+              ],
+            },
+          }),
+      prisma.project.count({
+        where: {
+          piStatus: "VERIFIED",
+          files: { none: { type: "PO" } },
+          ...pocFilter,
+        },
+      }),
     ])
 
-    return NextResponse.json({ totalProjects, pendingApprovals })
+    const pendingPiPo = pendingPiCount + pendingPoCount
+
+    return NextResponse.json({ totalProjects, pendingApprovals, pendingPiPo })
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch counts" }, { status: 500 })
   }

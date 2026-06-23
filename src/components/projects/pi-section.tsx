@@ -133,6 +133,10 @@ export function PISection({
 
   // Reject PI (Admin only)
   const handleRejectPI = async () => {
+    if (!rejectNotes.trim()) {
+      toast.error("Please provide a reason for rejecting the PI.")
+      return
+    }
     setIsVerifying(true)
     try {
       const res = await fetch(`/api/projects/${projectId}/verify-pi`, {
@@ -572,7 +576,11 @@ export function PISection({
                   onClick={handleRejectPI}
                   disabled={isVerifying}
                   className="btn btn-primary"
-                  style={{ background: "#dc2626" }}
+                  style={{
+                    background: isVerifying ? "var(--gray-300)" : "#dc2626",
+                    borderColor: isVerifying ? "var(--gray-300)" : "#dc2626",
+                    cursor: isVerifying ? "not-allowed" : "pointer",
+                  }}
                 >
                   {isVerifying ? "Rejecting..." : "Reject PI"}
                 </button>

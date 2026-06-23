@@ -35,22 +35,47 @@ async function deleteS3Asset(url: string | null | undefined) {
   }
 }
 
-async function priceCollaterals(collaterals: Array<{ itemName: string; quantity: number; specification?: string | null }>) {
+async function priceCollaterals(projectId: string, collaterals: Array<{ itemName: string; quantity: number; specification?: string | null }>) {
   const priced = await Promise.all(collaterals.map(async (c) => {
     const calc = await calculateTotal(c.itemName, c.quantity)
-    if (calc === null) {
-      throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
+    if (calc !== null) {
+      return {
+        itemName: c.itemName,
+        quantity: c.quantity,
+        unitPrice: calc.unitPrice,
+        totalPrice: calc.subtotal,
+        gstRate: calc.gstRate,
+        gstAmount: calc.gst,
+        specification: c.specification || null,
+      }
     }
 
-    return {
-      itemName: c.itemName,
-      quantity: c.quantity,
-      unitPrice: calc.unitPrice,
-      totalPrice: calc.subtotal,
-      gstRate: calc.gstRate,
-      gstAmount: calc.gst,
-      specification: c.specification || null,
+    // Fallback to existing collateral price on project update if rate card is missing
+    const existingCollateral = await prisma.collateral.findFirst({
+      where: {
+        projectId,
+        itemName: c.itemName,
+      }
+    })
+
+    if (existingCollateral) {
+      const unitPrice = existingCollateral.unitPrice
+      const gstRate = existingCollateral.gstRate ?? 18
+      const totalPrice = unitPrice * c.quantity
+      const gstAmount = totalPrice * (gstRate / 100)
+
+      return {
+        itemName: c.itemName,
+        quantity: c.quantity,
+        unitPrice,
+        totalPrice,
+        gstRate,
+        gstAmount,
+        specification: c.specification || existingCollateral.specification,
+      }
     }
+
+    throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
   }))
 
   return {
@@ -122,7 +147,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
     const body = await request.json()
-    const { name, pocId, clientId, location, branch, state, deliveryDate, instructions, collaterals, status, note, dispatch, packingCharges, packingChargesGstRate, recipientName, recipientContact, recipientBranch } = body
+    const { name, pocId, clientId, location, branch, state, deliveryDate, instructions, collaterals, status, note, dispatch, packingCharges, packingChargesGstRate, deliveryCharges, deliveryChargesGstRate, piRejectionNote, recipientName, recipientContact, recipientBranch } = body
 
     // clientId: "" means "remove client" - treat as null (client is optional)
 
@@ -145,6 +170,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         instructions: true,
         packingCharges: true,
         packingChargesGstRate: true,
+        deliveryCharges: true,
+        deliveryChargesGstRate: true,
+        piRejectionNote: true,
         recipientName: true,
         recipientContact: true,
         recipientBranch: true,
@@ -158,7 +186,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const isClient = session.user.role === "CLIENT"
     const isOwner = existing.pocId === session.user.id
     const projectApprovedByAdmin = existing.approval?.status === "APPROVED" || !["REQUESTED", "CANCELLED"].includes(existing.status)
-    const pocCanManageAfterApproval = isOwner && projectApprovedByAdmin && existing.piStatus === "VERIFIED"
+    const pocCanManageAfterApproval = isOwner && projectApprovedByAdmin
     const isStatusUpdate = status !== undefined
     const isDispatchUpdate = dispatch !== undefined
     const isProjectDetailsUpdate = [
@@ -173,6 +201,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       collaterals,
       packingCharges,
       packingChargesGstRate,
+      deliveryCharges,
+      deliveryChargesGstRate,
+      piRejectionNote,
+      recipientName,
+      recipientContact,
+      recipientBranch,
     ].some((value) => value !== undefined)
 
     // Check if any details affecting PI have changed (only if project already has a PI number)
@@ -197,6 +231,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const instructionsChanged = instructions !== undefined && instructions !== existing.instructions
       const packingChargesChanged = packingCharges !== undefined && packingCharges !== existing.packingCharges
       const packingChargesGstRateChanged = packingChargesGstRate !== undefined && packingChargesGstRate !== existing.packingChargesGstRate
+      const deliveryChargesChanged = deliveryCharges !== undefined && deliveryCharges !== existing.deliveryCharges
+      const deliveryChargesGstRateChanged = deliveryChargesGstRate !== undefined && deliveryChargesGstRate !== existing.deliveryChargesGstRate
       const recipientNameChanged = recipientName !== undefined && recipientName !== existing.recipientName
       const recipientContactChanged = recipientContact !== undefined && recipientContact !== existing.recipientContact
       const recipientBranchChanged = recipientBranch !== undefined && recipientBranch !== existing.recipientBranch
@@ -218,6 +254,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       detailsChanged = nameChanged || pocIdChanged || clientIdChanged || locationChanged || branchChanged || stateChanged ||
         deliveryDateChanged || instructionsChanged || packingChargesChanged || packingChargesGstRateChanged ||
+        deliveryChargesChanged || deliveryChargesGstRateChanged ||
         recipientNameChanged || recipientContactChanged || recipientBranchChanged || collateralsChanged
     }
 
@@ -241,7 +278,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     if ((isStatusUpdate || isDispatchUpdate) && !isAdmin && !pocCanManageAfterApproval) {
-      return NextResponse.json({ error: "POCs can update status or dispatch only after admin approves the project and verifies the PI" }, { status: 403 })
+      return NextResponse.json({ error: "POCs can update status or dispatch only after admin approves the project" }, { status: 403 })
     }
 
     // POC cannot modify collaterals after submission
@@ -282,6 +319,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (instructions !== undefined) updateData.instructions = instructions
     if (packingCharges !== undefined) updateData.packingCharges = packingCharges
     if (packingChargesGstRate !== undefined) updateData.packingChargesGstRate = packingChargesGstRate
+    if (deliveryCharges !== undefined) updateData.deliveryCharges = deliveryCharges
+    if (deliveryChargesGstRate !== undefined) updateData.deliveryChargesGstRate = deliveryChargesGstRate
+    if (piRejectionNote !== undefined) updateData.piRejectionNote = piRejectionNote === "" ? null : piRejectionNote
     if (recipientName !== undefined) updateData.recipientName = recipientName === "" ? null : recipientName
     if (recipientContact !== undefined) updateData.recipientContact = recipientContact === "" ? null : recipientContact
     if (recipientBranch !== undefined) updateData.recipientBranch = recipientBranch === "" ? null : recipientBranch
@@ -294,18 +334,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         if (newStatus === "PRINTING") {
           if (existing.status !== "APPROVED") {
             return NextResponse.json({ error: "Project must be APPROVED before moving to PRINTING status" }, { status: 400 })
-          }
-
-          if (existing.piStatus !== "VERIFIED") {
-            return NextResponse.json({ error: "Proforma Invoice (PI) must be verified by admin before moving to PRINTING status" }, { status: 400 })
-          }
-
-          // Check if PO is uploaded
-          const poExists = await prisma.fileUpload.findFirst({
-            where: { projectId: id, type: "PO" }
-          })
-          if (!poExists) {
-            return NextResponse.json({ error: "PO document required before moving to PRINTING status" }, { status: 400 })
           }
 
           // Send Production Started email to POC
@@ -338,14 +366,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json({ error: "Dispatch details required before moving to DISPATCHED status" }, { status: 400 })
           }
 
-          // Check if Challan is uploaded
-          const challanExists = await prisma.fileUpload.findFirst({
-            where: { projectId: id, type: "CHALLAN" }
-          })
-          if (!challanExists) {
-            return NextResponse.json({ error: "Challan document required before moving to DISPATCHED status" }, { status: 400 })
-          }
-
           // Send Shipment Dispatched email to POC
           if (existing.poc?.email && dispatchExists) {
             try {
@@ -370,22 +390,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json({ error: "Project must be in DISPATCHED status before moving to DELIVERED status" }, { status: 400 })
           }
 
-          const [challanExists, invoiceExists, dispatch] = await Promise.all([
-            prisma.fileUpload.findFirst({ where: { projectId: id, type: "CHALLAN" } }),
-            prisma.fileUpload.findFirst({ where: { projectId: id, type: "INVOICE" } }),
-            prisma.dispatch.findUnique({ where: { projectId: id }, select: { id: true, podUrl: true } }),
-          ])
-
-          if (!challanExists || !invoiceExists || !dispatch?.podUrl) {
-            return NextResponse.json({
-              error: "Challan, Invoice and POD are required before moving to DELIVERED status",
-            }, { status: 400 })
+          const dispatch = await prisma.dispatch.findUnique({ where: { projectId: id }, select: { id: true } })
+          if (dispatch?.id) {
+            await prisma.dispatch.update({
+              where: { id: dispatch.id },
+              data: { actualDelivery: new Date(), status: "delivered" },
+            })
           }
-
-          await prisma.dispatch.update({
-            where: { id: dispatch.id },
-            data: { actualDelivery: new Date(), status: "delivered" },
-          })
         }
       }
 
@@ -399,7 +410,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (collaterals !== undefined) {
       let priced: Awaited<ReturnType<typeof priceCollaterals>>
       try {
-        priced = await priceCollaterals(collaterals)
+        priced = await priceCollaterals(id, collaterals)
       } catch (error) {
         return NextResponse.json({
           error: error instanceof Error ? error.message : "Invalid collateral pricing",
@@ -417,24 +428,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           specification: c.specification,
         })),
       }
-      // Calculate total cost including items GST and packing charges with their GST
+      // Calculate total cost including items GST, packing charges, and delivery charges with their GST
       const itemsGst = priced.totalGst
-      const packingSubtotal = packingCharges || 0
-      const packingGst = packingSubtotal * ((packingChargesGstRate ?? 18) / 100)
-
-      updateData.totalCost = priced.subtotal + packingSubtotal
-      updateData.grandTotal = priced.subtotal + itemsGst + packingSubtotal + packingGst
-    } else if (packingCharges !== undefined || packingChargesGstRate !== undefined) {
-      // Only packing charges updated - recalculate total cost
-      const existingCollaterals = await prisma.collateral.findMany({ where: { projectId: id } })
-      const subtotal = existingCollaterals.reduce((sum, c) => sum + c.totalPrice, 0)
-      const itemsGst = existingCollaterals.reduce((sum, c) => sum + c.gstAmount, 0)
       const packingSubtotal = packingCharges !== undefined ? packingCharges : (existing.packingCharges || 0)
       const packingRate = packingChargesGstRate !== undefined ? packingChargesGstRate : (existing.packingChargesGstRate ?? 18)
       const packingGst = packingSubtotal * (packingRate / 100)
+      
+      const deliverySubtotal = deliveryCharges !== undefined ? deliveryCharges : (existing.deliveryCharges || 0)
+      const deliveryRate = deliveryChargesGstRate !== undefined ? deliveryChargesGstRate : (existing.deliveryChargesGstRate ?? 18)
+      const deliveryGst = deliverySubtotal * (deliveryRate / 100)
 
-      updateData.totalCost = subtotal + packingSubtotal
-      updateData.grandTotal = subtotal + itemsGst + packingSubtotal + packingGst
+      updateData.totalCost = priced.subtotal + packingSubtotal + deliverySubtotal
+      updateData.grandTotal = priced.subtotal + itemsGst + packingSubtotal + packingGst + deliverySubtotal + deliveryGst
+    } else if (
+      packingCharges !== undefined ||
+      packingChargesGstRate !== undefined ||
+      deliveryCharges !== undefined ||
+      deliveryChargesGstRate !== undefined
+    ) {
+      // Only packing/delivery charges updated - recalculate total cost
+      const existingCollaterals = await prisma.collateral.findMany({ where: { projectId: id } })
+      const subtotal = existingCollaterals.reduce((sum, c) => sum + c.totalPrice, 0)
+      const itemsGst = existingCollaterals.reduce((sum, c) => sum + c.gstAmount, 0)
+      
+      const packingSubtotal = packingCharges !== undefined ? packingCharges : (existing.packingCharges || 0)
+      const packingRate = packingChargesGstRate !== undefined ? packingChargesGstRate : (existing.packingChargesGstRate ?? 18)
+      const packingGst = packingSubtotal * (packingRate / 100)
+      
+      const deliverySubtotal = deliveryCharges !== undefined ? deliveryCharges : (existing.deliveryCharges || 0)
+      const deliveryRate = deliveryChargesGstRate !== undefined ? deliveryChargesGstRate : (existing.deliveryChargesGstRate ?? 18)
+      const deliveryGst = deliverySubtotal * (deliveryRate / 100)
+
+      updateData.totalCost = subtotal + packingSubtotal + deliverySubtotal
+      updateData.grandTotal = subtotal + itemsGst + packingSubtotal + packingGst + deliverySubtotal + deliveryGst
     }
 
     // Update dispatch if provided
@@ -489,6 +515,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             totalCost: freshProject.totalCost,
             packingCharges: freshProject.packingCharges,
             packingChargesGstRate: freshProject.packingChargesGstRate,
+            deliveryCharges: freshProject.deliveryCharges,
+            deliveryChargesGstRate: freshProject.deliveryChargesGstRate,
             pocName: freshProject.poc?.name || freshProject.pocName || undefined,
             pocEmail: freshProject.poc?.email || undefined,
             clientName: freshProject.client?.name || freshProject.clientName || undefined,

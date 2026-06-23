@@ -67,9 +67,11 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
   const [rateCards, setRateCards] = useState<RateCardItem[]>([])
   const [formData, setFormData] = useState({
     name: "", pocId: "", clientId: "", city: "", branch: "", deliveryDate: "", instructions: "", packingCharges: "", packingChargesGstRate: "18",
+    deliveryCharges: "", deliveryChargesGstRate: "18",
     recipientName: "", recipientContact: "", recipientBranch: "", sameAsPoc: false,
   })
   const [showPackingForm, setShowPackingForm] = useState(false)
+  const [showDeliveryForm, setShowDeliveryForm] = useState(false)
 
   const [cities, setCities] = useState<string[]>(CITIES)
   const [branchLocations, setBranchLocations] = useState<Record<string, { state: string; branches: string[] }>>(BRANCH_LOCATIONS)
@@ -241,9 +243,15 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
   const packingChargesGstRate = isNaN(parsedPackingChargesGstRate) ? 18 : parsedPackingChargesGstRate
   const packingChargesGst = packingCharges * (packingChargesGstRate / 100)
 
+  // Delivery charges with custom GST rate
+  const deliveryCharges = parseFloat(formData.deliveryCharges) || 0
+  const parsedDeliveryChargesGstRate = parseFloat(formData.deliveryChargesGstRate)
+  const deliveryChargesGstRate = isNaN(parsedDeliveryChargesGstRate) ? 18 : parsedDeliveryChargesGstRate
+  const deliveryChargesGst = deliveryCharges * (deliveryChargesGstRate / 100)
+
   // Total GST and final cost
-  const gstAmount = collateralsGst + packingChargesGst
-  const totalCost = subtotal + packingCharges + gstAmount
+  const gstAmount = collateralsGst + packingChargesGst + deliveryChargesGst
+  const totalCost = subtotal + packingCharges + deliveryCharges + gstAmount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -271,6 +279,8 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
           instructions: formData.instructions,
           packingCharges: packingCharges,
           packingChargesGstRate: packingChargesGstRate,
+          deliveryCharges: deliveryCharges,
+          deliveryChargesGstRate: deliveryChargesGstRate,
           recipientName: formData.recipientName || undefined,
           recipientContact: formData.recipientContact || undefined,
           recipientBranch: formData.recipientBranch || undefined,
@@ -570,64 +580,130 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
               {isFetching ? <><LoaderIcon /> Loading...</> : <><PlusIcon /> Add Another Collateral</>}
             </button>
 
-            {/* Packing Charges Button */}
-            {!showPackingForm ? (
-              <button
-                type="button"
-                onClick={() => setShowPackingForm(true)}
-                style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', background: 'var(--gray-100)', color: 'var(--gray-700)', fontWeight: 600, fontSize: '14px', border: '1px dashed var(--gray-400)', cursor: 'pointer' }}
-              >
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-                Add Packing Charges {formData.packingCharges ? `(₹${formData.packingCharges})` : ''}
-              </button>
-            ) : (
-              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--gray-50)', borderRadius: '10px', border: '1px solid var(--gray-200)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-700)' }}>Packing Charges</label>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '12px' }}>
+              {/* Packing Charges Section */}
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                {!showPackingForm ? (
                   <button
                     type="button"
-                    onClick={() => setShowPackingForm(false)}
-                    style={{ color: 'var(--gray-500)', cursor: 'pointer', background: 'none', border: 'none' }}
+                    onClick={() => setShowPackingForm(true)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', background: 'var(--gray-100)', color: 'var(--gray-700)', fontWeight: 600, fontSize: '14px', border: '1px dashed var(--gray-400)', cursor: 'pointer', boxSizing: 'border-box' }}
                   >
                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
+                    Add Packing Charges {formData.packingCharges ? `(₹${formData.packingCharges})` : ''}
                   </button>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                  <div style={{ flex: 2 }}>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px', display: 'block' }}>Amount (₹)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.packingCharges}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, packingCharges: e.target.value }) }}
-                      placeholder="Enter amount"
-                      step="0.01"
-                      min="0"
-                      style={{ width: '100%' }}
-                    />
+                ) : (
+                  <div style={{ padding: '16px', background: 'var(--gray-50)', borderRadius: '10px', border: '1px solid var(--gray-200)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-700)' }}>Packing Charges</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowPackingForm(false)}
+                        style={{ color: 'var(--gray-500)', cursor: 'pointer', background: 'none', border: 'none' }}
+                      >
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ flex: 2 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px', display: 'block' }}>Amount (₹)</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={formData.packingCharges}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, packingCharges: e.target.value }) }}
+                          placeholder="Enter amount"
+                          step="0.01"
+                          min="0"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px', display: 'block' }}>GST %</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={formData.packingChargesGstRate}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, packingChargesGstRate: e.target.value }) }}
+                          placeholder="18"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                     <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>GST @ {formData.packingChargesGstRate !== "" ? formData.packingChargesGstRate : 18}% will be applied on packing charges</p>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px', display: 'block' }}>GST %</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.packingChargesGstRate}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, packingChargesGstRate: e.target.value }) }}
-                      placeholder="18"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      style={{ width: '100%' }}
-                    />
-                  </div>
-                </div>
-                 <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>GST @ {formData.packingChargesGstRate !== "" ? formData.packingChargesGstRate : 18}% will be applied on packing charges</p>
+                )}
               </div>
-            )}
+
+              {/* Delivery Charges Section */}
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                {!showDeliveryForm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeliveryForm(true)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', background: 'var(--gray-100)', color: 'var(--gray-700)', fontWeight: 600, fontSize: '14px', border: '1px dashed var(--gray-400)', cursor: 'pointer', boxSizing: 'border-box' }}
+                  >
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 001-1v-4h3m4 4h.01M21 16v-2a2 2 0 00-2-2h-3V7a1 1 0 00-1-1H13" />
+                    </svg>
+                    Add Delivery Charges {formData.deliveryCharges ? `(₹${formData.deliveryCharges})` : ''}
+                  </button>
+                ) : (
+                  <div style={{ padding: '16px', background: 'var(--gray-50)', borderRadius: '10px', border: '1px solid var(--gray-200)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gray-700)' }}>Delivery Charges</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeliveryForm(false)}
+                        style={{ color: 'var(--gray-500)', cursor: 'pointer', background: 'none', border: 'none' }}
+                      >
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ flex: 2 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px', display: 'block' }}>Amount (₹)</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={formData.deliveryCharges}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, deliveryCharges: e.target.value }) }}
+                          placeholder="Enter amount"
+                          step="0.01"
+                          min="0"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px', display: 'block' }}>GST %</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={formData.deliveryChargesGstRate}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, deliveryChargesGstRate: e.target.value }) }}
+                          placeholder="18"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                     <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>GST @ {formData.deliveryChargesGstRate !== "" ? formData.deliveryChargesGstRate : 18}% will be applied on delivery charges</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -746,11 +822,20 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
             </div>
             {/* Packing with GST (if applicable) */}
             {packingCharges > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-600)' }}>
                   Packing (₹{packingCharges} + {packingChargesGstRate}% GST):
                 </span>
                 <Currency amount={packingCharges + packingChargesGst} size="14px" color="#0ea5e9" />
+              </div>
+            )}
+            {/* Delivery with GST (if applicable) */}
+            {deliveryCharges > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gray-600)' }}>
+                  Delivery (₹{deliveryCharges} + {deliveryChargesGstRate}% GST):
+                </span>
+                <Currency amount={deliveryCharges + deliveryChargesGst} size="14px" color="#0ea5e9" />
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '16px', borderTop: '2px solid var(--gray-200)', alignItems: 'center' }}>
@@ -759,7 +844,7 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
             </div>
              <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '10px', textAlign: 'center' }}>
               <p style={{ fontSize: '13px', color: '#1e40af', fontWeight: 500, margin: 0 }}>
-                💡 Product GST rates: {collaterals.filter(c => c.itemName).map(c => `${c.itemName} (${c.gstRate ?? 18}%)`).join(', ')}{packingCharges > 0 ? ` | Packing: ${packingChargesGstRate}%` : ''}
+                💡 Product GST rates: {collaterals.filter(c => c.itemName).map(c => `${c.itemName} (${c.gstRate ?? 18}%)`).join(', ')}{packingCharges > 0 ? ` | Packing: ${packingChargesGstRate}%` : ''}{deliveryCharges > 0 ? ` | Delivery: ${deliveryChargesGstRate}%` : ''}
               </p>
             </div>
           </div>
