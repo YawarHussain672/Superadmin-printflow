@@ -24,8 +24,8 @@ export async function proxy(req: NextRequest) {
     const isMutation = ["POST", "PATCH", "DELETE", "PUT"].includes(method)
 
     if (isMutation && token && token.role === "SUPERADMIN") {
-      // Allow SuperAdmins to create/manage clients/admins
-      const isSuperAdminApi = path.startsWith("/api/superadmin/")
+      // Allow SuperAdmins to create/manage clients/admins, or trigger cron actions
+      const isSuperAdminApi = path.startsWith("/api/superadmin/") || path.startsWith("/api/cron/")
       if (!isSuperAdminApi) {
         return new NextResponse(
           JSON.stringify({ error: "Forbidden: SuperAdmins are read-only on tenant records." }),
