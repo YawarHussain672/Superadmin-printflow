@@ -387,7 +387,7 @@ export function SuperAdminPendingPiPoClient({
   }
 
   return (
-    <div>
+    <div style={{ display: 'inline-block', minWidth: 'max-content', width: '100%', verticalAlign: 'top' }}>
       {/* Page Header */}
       <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
@@ -490,7 +490,7 @@ export function SuperAdminPendingPiPoClient({
       )}
 
       {/* Control Card with Tabs and Search */}
-      <div className="card" style={{ marginBottom: "24px" }}>
+      <div className="card" style={{ minWidth: activeTab === "settings" ? "100%" : "1150px", width: "100%", marginBottom: "24px" }}>
         <div
           style={{
             padding: "16px 20px",
