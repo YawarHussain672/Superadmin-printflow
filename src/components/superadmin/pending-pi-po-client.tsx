@@ -595,6 +595,7 @@ export function SuperAdminPendingPiPoClient({
                 {filteredPo.length}
               </span>
             </button>
+            {/*
             <button
               onClick={() => setActiveTab("settings")}
               style={{
@@ -614,6 +615,7 @@ export function SuperAdminPendingPiPoClient({
             >
               Reminder Control Center
             </button>
+            */}
           </div>
 
           {/* Search Box */}
