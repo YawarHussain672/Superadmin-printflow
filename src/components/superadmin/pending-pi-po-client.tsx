@@ -423,6 +423,7 @@ export function SuperAdminPendingPiPoClient({
           <h1 className="page-title">SuperAdmin Pending PI/PO</h1>
           <p className="page-subtitle">Manage Proforma Invoices verification and Purchase Orders across all organization tenants</p>
         </div>
+        {/*
         {activeTab !== "settings" && (
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <button
@@ -472,6 +473,7 @@ export function SuperAdminPendingPiPoClient({
             </button>
           </div>
         )}
+        */}
       </div>
 
       {/* SuperAdmin Filtering Section */}
