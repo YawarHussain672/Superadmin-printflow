@@ -826,7 +826,7 @@ export function SuperAdminPendingPiPoClient({
                       </div>
                     </div>
 
-                    {/* Send Digest Summary to Org Admins */}
+                    {/* Send Digest Summary to Org Admins (Hidden for now)
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: "1px solid var(--gray-200)", paddingTop: "20px", maxWidth: "400px" }}>
                       <div>
                         <label style={{ fontWeight: 700, fontSize: "14px", color: "var(--gray-900)", display: "block", marginBottom: "4px" }}>
@@ -861,6 +861,7 @@ export function SuperAdminPendingPiPoClient({
                         Send Admin Summary Email
                       </button>
                     </div>
+                    */}
                   </>
                 )}
               </div>
