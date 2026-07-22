@@ -87,7 +87,6 @@ const ChevronRightIcon = () => (
 const PROJECT_CREATED_EVENT = "project-created"
 const PROJECT_DELETED_EVENT = "project-deleted"
 
-
 export function ProjectsPageClient() {
   const router = useRouter()
   const searchParams = useSearchParams()

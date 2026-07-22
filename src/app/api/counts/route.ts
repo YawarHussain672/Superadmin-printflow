@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
-import { ProjectStatus } from "@prisma/client"
 import { authOptions } from "@/lib/auth"
 
 export async function GET() {
@@ -16,46 +15,38 @@ export async function GET() {
     const isPrivileged = isAdmin || isSuperAdmin
     const pocFilter = isPrivileged ? {} : { pocId: session.user.id }
 
-    const [totalProjects, pendingApprovals, pendingPiCount, pendingPoCount] = await Promise.all([
+    const [totalProjects, pendingApprovals, pendingPoCount, outstandingPaymentsCount] = await Promise.all([
       prisma.project.count({ where: pocFilter }),
       isPrivileged
         ? prisma.approval.count({ where: { status: "PENDING" } })
         : prisma.approval.count({ where: { status: "PENDING", requestedById: session.user.id } }),
-      isPrivileged
-        ? prisma.project.count({
-            where: {
-              status: { not: "CANCELLED" },
-              OR: [
-                { piStatus: "PENDING" },
-                { piStatus: "REJECTED" },
-                { piStatus: null, piNumber: null },
-              ],
-            },
-          })
-        : prisma.project.count({
-            where: {
-              pocId: session.user.id,
-              status: { not: "CANCELLED" },
-              OR: [
-                { piStatus: "PENDING" },
-                { piStatus: "REJECTED" },
-                { piStatus: null, piNumber: null },
-              ],
-            },
-          }),
       prisma.project.count({
         where: {
+          status: { not: "CANCELLED" },
           piStatus: "VERIFIED",
           files: { none: { type: "PO" } },
           ...pocFilter,
         },
       }),
+      prisma.project.count({
+        where: {
+          status: { not: "CANCELLED" },
+          paymentCaptured: false,
+          files: { some: { type: "INVOICE" } },
+          ...pocFilter,
+        },
+      }),
     ])
 
-    const pendingPiPo = pendingPiCount + pendingPoCount
-
-    return NextResponse.json({ totalProjects, pendingApprovals, pendingPiPo })
+    return NextResponse.json({
+      totalProjects,
+      pendingApprovals,
+      pendingPiPo: pendingPoCount,
+      pendingPo: pendingPoCount,
+      outstandingPayments: outstandingPaymentsCount,
+    })
   } catch (error) {
+    console.error("Failed to fetch counts:", error)
     return NextResponse.json({ error: "Failed to fetch counts" }, { status: 500 })
   }
 }

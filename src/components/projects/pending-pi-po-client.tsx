@@ -57,7 +57,7 @@ interface PendingPiPoClientProps {
 export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole, initialSettings }: PendingPiPoClientProps) {
   const router = useRouter()
   const isAdmin = userRole === "ADMIN"
-  const [activeTab, setActiveTab] = useState<"pi" | "po" | "settings">("pi")
+  const [activeTab, setActiveTab] = useState<"po" | "settings">("po")
   const [searchQuery, setSearchQuery] = useState("")
   const [pendingPi, setPendingPi] = useState<Project[]>(initialPendingPi)
   const [pendingPo, setPendingPo] = useState<Project[]>(initialPendingPo)
@@ -69,7 +69,7 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
   const [selectedUserEmail, setSelectedUserEmail] = useState("")
   const [usersList, setUsersList] = useState<{ id: string; name: string; email: string; role: string; active: boolean }[]>([])
   const [sendingDirectReminder, setSendingDirectReminder] = useState(false)
-  const [selectedReminderType, setSelectedReminderType] = useState<"BOTH" | "PI" | "PO">("BOTH")
+  const [selectedReminderType, setSelectedReminderType] = useState<"BOTH" | "PI" | "PO">("PO")
 
   // Fetch active POCs for direct reminder selector
   useEffect(() => {
@@ -386,34 +386,11 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
       {/* Page Header */}
       <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h1 className="page-title">Pending PI/PO</h1>
-          <p className="page-subtitle">Verify pending Proforma Invoices or upload Purchase Orders for projects</p>
+          <h1 className="page-title">Pending PO</h1>
+          <p className="page-subtitle">View and upload Purchase Orders (PO) for verified projects</p>
         </div>
         {isAdmin && (
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <button
-              onClick={() => handleSendAllReminders("PI")}
-              disabled={sendingAllPiReminders || sendingAllPoReminders}
-              className="btn btn-primary"
-              style={{
-                background: "linear-gradient(135deg, var(--axis-accent) 0%, #008ba3 100%)",
-                boxShadow: "0 4px 12px rgba(0, 168, 204, 0.2)",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                whiteSpace: "nowrap"
-              }}
-            >
-              {sendingAllPiReminders ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <svg style={{ width: "16px", height: "16px" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              )}
-              Send All PI Reminders
-            </button>
-
             <button
               onClick={() => handleSendAllReminders("PO")}
               disabled={sendingAllPiReminders || sendingAllPoReminders}
@@ -455,37 +432,6 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
         >
           {/* Tabs */}
           <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              onClick={() => setActiveTab("pi")}
-              style={{
-                padding: "10px 16px",
-                background: "none",
-                border: "none",
-                borderBottom: activeTab === "pi" ? "3px solid var(--axis-primary)" : "3px solid transparent",
-                color: activeTab === "pi" ? "var(--axis-primary)" : "var(--gray-500)",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                fontSize: "14px",
-                transition: "all 0.2s",
-              }}
-            >
-              Pending PI
-              <span
-                style={{
-                  fontSize: "11px",
-                  background: activeTab === "pi" ? "var(--axis-primary)" : "var(--gray-200)",
-                  color: activeTab === "pi" ? "white" : "var(--gray-600)",
-                  padding: "2px 8px",
-                  borderRadius: "9999px",
-                  fontWeight: 600,
-                }}
-              >
-                {pendingPi.length}
-              </span>
-            </button>
             <button
               onClick={() => setActiveTab("po")}
               style={{
@@ -723,232 +669,6 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
                 </div>
               </div>
             </div>
-          ) : activeTab === "pi" ? (
-            filteredPi.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px", color: "var(--gray-500)" }}>
-                <CheckCircle size={36} color="#10b981" style={{ margin: "0 auto 12px" }} />
-                <h3>No pending Proforma Invoices</h3>
-                <p style={{ fontSize: "14px", marginTop: "4px" }}>All requested PIs are verified.</p>
-              </div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Project ID</th>
-                    <th>Project Name</th>
-                    <th>Assigned To</th>
-                    <th>Location</th>
-                    <th>Delivery Date</th>
-                    <th>PI Details</th>
-                    <th>Total Amount</th>
-                    <th style={{ width: "260px" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPi.map((project) => {
-                    const collateralGst = project.collaterals.reduce(
-                      (s, c) => s + c.totalPrice * ((c.gstRate ?? 18) / 100),
-                      0
-                    )
-                    const computedGrandTotal = project.totalCost + collateralGst
-                    const displayTotal = project.grandTotal > 0 ? project.grandTotal : computedGrandTotal
-
-                    return (
-                      <tr key={project.id} onClick={() => router.push(`/projects/${project.id}`)} style={{ cursor: "pointer", transition: "background-color 0.2s" }} className="hover:bg-gray-50">
-                        <td className="project-id">
-                          <Link href={`/projects/${project.id}`}>{project.projectId}</Link>
-                        </td>
-                        <td>
-                          <Link href={`/projects/${project.id}`} style={{ fontWeight: 700, color: "var(--gray-900)" }}>
-                            {project.name}
-                          </Link>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                            <span style={{ fontWeight: 600 }}>{project.poc?.name || project.pocName || "—"}</span>
-                            {project.client?.name && (
-                              <span style={{ fontSize: "11px", color: "var(--gray-500)" }}>
-                                Client: {project.client.name}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          {project.location}
-                          {project.branch ? ` (${project.branch})` : ""}
-                        </td>
-                        <td>{formatDate(project.deliveryDate)}</td>
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                            {project.piNumber ? (
-                              <span className="font-mono" style={{ fontWeight: 600 }}>{project.piNumber}</span>
-                            ) : (
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  padding: "2px 6px",
-                                  borderRadius: "4px",
-                                  fontWeight: 600,
-                                  alignSelf: "flex-start",
-                                  background: project.piStatus === "REJECTED" ? "#fee2e2" : "#f1f5f9",
-                                  color: project.piStatus === "REJECTED" ? "#991b1b" : "#475569",
-                                }}
-                              >
-                                {project.piStatus === "REJECTED" ? "Rejected" : "Not Generated"}
-                              </span>
-                            )}
-                            {project.piStatus === "REJECTED" && project.piRejectionNote && (
-                              <span
-                                style={{
-                                  fontSize: "11.5px",
-                                  color: "#dc2626",
-                                  marginTop: "4px",
-                                  fontWeight: 600,
-                                  maxWidth: "180px",
-                                  wordBreak: "break-word",
-                                }}
-                              >
-                                Reason: {project.piRejectionNote}
-                              </span>
-                            )}
-                            {project.piGeneratedAt && (
-                              <span style={{ fontSize: "11px", color: "var(--gray-500)" }}>
-                                Gen: {new Date(project.piGeneratedAt).toLocaleDateString("en-IN")}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="font-mono">
-                          <div style={{ display: "flex", flexDirection: "column" }}>
-                            <span style={{ fontWeight: 700 }}>{formatCurrency(displayTotal)}</span>
-                            <span style={{ fontSize: "11px", color: "var(--gray-500)" }}>
-                              GST: {formatCurrency(displayTotal - project.totalCost)}
-                            </span>
-                            <span style={{ fontSize: "11px", color: "var(--gray-500)" }}>
-                              Base: {formatCurrency(project.totalCost)}
-                            </span>
-                          </div>
-                        </td>
-                        <td onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}>
-                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                            {project.piPdfUrl && (
-                              <>
-                                <button
-                                  onClick={() => handleViewPI(project)}
-                                  className="btn btn-secondary"
-                                  style={{ padding: "6px 10px", fontSize: "12px" }}
-                                  title="View PI"
-                                >
-                                  <Eye size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleDownloadPI(project)}
-                                  className="btn btn-secondary"
-                                  style={{ padding: "6px 10px", fontSize: "12px" }}
-                                  title="Download PI"
-                                >
-                                  <Download size={14} />
-                                </button>
-                              </>
-                            )}
-                            {isAdmin && project.piStatus === "PENDING" && (
-                              <>
-                                <button
-                                  onClick={() => handleVerifyPI(project.id)}
-                                  disabled={submittingId !== null}
-                                  className="btn btn-primary"
-                                  style={{
-                                    padding: "6px 12px",
-                                    fontSize: "12px",
-                                    background: "#10b981",
-                                    borderColor: "#10b981",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                  title="Verify PI"
-                                >
-                                  {submittingId === project.id ? (
-                                    <Loader2 size={12} className="animate-spin" />
-                                  ) : (
-                                    <CheckCircle size={12} />
-                                  )}
-                                  Verify
-                                </button>
-                                <button
-                                  onClick={() => setRejectingProjectId(project.id)}
-                                  disabled={submittingId !== null}
-                                  className="btn btn-secondary"
-                                  style={{
-                                    padding: "6px 12px",
-                                    fontSize: "12px",
-                                    color: "#ef4444",
-                                    borderColor: "#fee2e2",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                  }}
-                                  title="Reject PI"
-                                >
-                                  <XCircle size={12} />
-                                  Reject
-                                </button>
-                              </>
-                            )}
-                            {!isAdmin && (
-                              <>
-                                {(!project.piNumber || project.piStatus === "REJECTED") ? (
-                                  <button
-                                    onClick={() => handleGeneratePI(project.id)}
-                                    disabled={submittingId !== null}
-                                    className="btn btn-primary"
-                                    style={{
-                                      padding: "6px 12px",
-                                      fontSize: "12px",
-                                      background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-                                      borderColor: "#2563eb",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "4px",
-                                    }}
-                                    title={project.piStatus === "REJECTED" ? "Regenerate PI" : "Generate PI"}
-                                  >
-                                    {submittingId === project.id ? (
-                                      <Loader2 size={12} className="animate-spin" />
-                                    ) : project.piStatus === "REJECTED" ? (
-                                      <RefreshCw size={12} />
-                                    ) : (
-                                      <FileText size={12} />
-                                    )}
-                                    {project.piStatus === "REJECTED" ? "Regenerate PI" : "Generate PI"}
-                                  </button>
-                                ) : (
-                                  project.piStatus === "PENDING" && (
-                                    <span
-                                      style={{
-                                        fontSize: "12px",
-                                        padding: "4px 8px",
-                                        background: "#fef9c3",
-                                        color: "#854d0e",
-                                        borderRadius: "4px",
-                                        fontWeight: 600,
-                                        display: "inline-block",
-                                      }}
-                                    >
-                                      Pending Admin Review
-                                    </span>
-                                  )
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )
           ) : filteredPo.length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px", color: "var(--gray-500)" }}>
               <CheckCircle size={36} color="#10b981" style={{ margin: "0 auto 12px" }} />

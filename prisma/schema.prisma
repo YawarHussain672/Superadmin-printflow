@@ -101,6 +101,13 @@ model Project {
   packingChargesGstRate Float           @default(18)
   deliveryCharges       Float           @default(0)
   deliveryChargesGstRate Float          @default(18)
+  paymentCaptured       Boolean         @default(false)
+  paymentCapturedAt     DateTime?
+  paymentTxnId          String?
+  paymentCapturedBy     String?
+  paymentNotes          String?
+  paymentReceiptUrl     String?
+  paymentReceiptFilename String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   pocId                 String?

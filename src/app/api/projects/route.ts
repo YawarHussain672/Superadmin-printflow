@@ -80,39 +80,52 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
     const limit = Math.min(100, parseInt(searchParams.get("limit") || "50"))
 
-    const where: Prisma.ProjectWhereInput = {}
-    if (status && status !== "all") where.status = status as ProjectStatus
-    if (poc && poc !== "all") where.pocId = poc
-    if (location && location !== "all") where.location = location
+    const conditions: Prisma.ProjectWhereInput[] = []
 
-    // CLIENT can only see their own projects (assigned to them as client)
+    if (status && status !== "all") {
+      conditions.push({ status: status as ProjectStatus })
+    }
+
+    if (location && location !== "all") {
+      conditions.push({ location })
+    }
+
+    // Role-based access control
     if (session.user.role === "CLIENT") {
-      where.clientId = session.user.id
+      conditions.push({ clientId: session.user.id })
+    } else if (session.user.role === "POC") {
+      // POC can strictly only see their own assigned projects or client projects they requested
+      conditions.push({
+        OR: [
+          { pocId: session.user.id },
+          {
+            AND: [
+              { clientId: { not: null } },
+              { approval: { requestedById: session.user.id } }
+            ]
+          }
+        ]
+      })
+    } else if (poc && poc !== "all") {
+      // Admin filtering by specific POC
+      conditions.push({ pocId: poc })
     }
 
-    // POC can see:
-    // 1. Their own projects (pocId = their id)
-    // 2. Client projects they created (approval.requestedById = their id AND clientId is set)
-    if (session.user.role === "POC") {
-      where.OR = [
-        { pocId: session.user.id },
-        {
-          AND: [
-            { clientId: { not: null } },
-            { approval: { requestedById: session.user.id } }
-          ]
-        }
-      ]
+    // Search query filter (scoped within user's permissions)
+    if (search && search.trim()) {
+      const q = search.trim()
+      conditions.push({
+        OR: [
+          { projectId: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" } },
+          { location: { contains: q, mode: "insensitive" } },
+          { poc: { name: { contains: q, mode: "insensitive" } } },
+          { dispatch: { trackingId: { contains: q, mode: "insensitive" } } },
+        ]
+      })
     }
-    if (search) {
-      where.OR = [
-        { projectId: { contains: search, mode: "insensitive" } },
-        { name: { contains: search, mode: "insensitive" } },
-        { location: { contains: search, mode: "insensitive" } },
-        { poc: { name: { contains: search, mode: "insensitive" } } },
-        { dispatch: { trackingId: { contains: search, mode: "insensitive" } } },
-      ]
-    }
+
+    const where: Prisma.ProjectWhereInput = conditions.length > 0 ? { AND: conditions } : {}
 
     const [projects, total, pocsList, locationGroups] = await Promise.all([
       prisma.project.findMany({

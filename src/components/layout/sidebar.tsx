@@ -73,10 +73,17 @@ const LogoutIcon = () => (
   </svg>
 )
 
+const CreditCardIcon = () => (
+  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <rect x="2" y="5" width="20" height="14" rx="2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="2" y1="10" x2="22" y2="10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
 export function Sidebar({ user, isOpen = true }: SidebarProps) {
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [counts, setCounts] = useState({ totalProjects: 0, pendingApprovals: 0, pendingPiPo: 0 })
+  const [counts, setCounts] = useState({ totalProjects: 0, pendingApprovals: 0, pendingPiPo: 0, outstandingPayments: 0 })
   const [countsLoaded, setCountsLoaded] = useState(false)
 
   // Fetch real-time counts
@@ -162,8 +169,8 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
           </Link>
           <Link href="/projects" className={`nav-item ${isActive("/projects") ? "active" : ""}`}>
             <FolderIcon />
-            {isClient ? "My Projects" : "All Projects"}
-            {countsLoaded && counts.totalProjects > 0 && !isClient && (
+            {isAdmin ? "All Projects" : "My Projects"}
+            {countsLoaded && counts.totalProjects > 0 && (
               <span className="nav-badge">{counts.totalProjects}</span>
             )}
           </Link>
@@ -179,9 +186,18 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
           {(isAdmin || user?.role === "POC") && (
             <Link href="/pending-pi-po" className={`nav-item ${isActive("/pending-pi-po") ? "active" : ""}`}>
               <ReceiptIcon />
-              Pending PI/PO
+              Pending PO
               {countsLoaded && counts.pendingPiPo > 0 && (
                 <span className="nav-badge">{counts.pendingPiPo}</span>
+              )}
+            </Link>
+          )}
+          {(isAdmin || user?.role === "POC") && (
+            <Link href="/outstanding-payments" className={`nav-item ${isActive("/outstanding-payments") ? "active" : ""}`}>
+              <CreditCardIcon />
+              Outstanding Payments
+              {countsLoaded && counts.outstandingPayments > 0 && (
+                <span className="nav-badge">{counts.outstandingPayments}</span>
               )}
             </Link>
           )}
@@ -269,9 +285,9 @@ export function Sidebar({ user, isOpen = true }: SidebarProps) {
             </button>
           </div>
         )}
-        <a 
-          href="https://www.rishirajmedia.com/" 
-          target="_blank" 
+        <a
+          href="https://www.rishirajmedia.com/"
+          target="_blank"
           rel="noopener noreferrer"
           style={{
             marginTop: '6px',

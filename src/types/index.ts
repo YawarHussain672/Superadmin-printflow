@@ -51,6 +51,13 @@ export interface Project {
   status: ProjectStatus
   totalCost: number
   instructions?: string
+  paymentCaptured?: boolean
+  paymentCapturedAt?: Date
+  paymentTxnId?: string
+  paymentCapturedBy?: string
+  paymentNotes?: string
+  paymentReceiptUrl?: string | null
+  paymentReceiptFilename?: string | null
   createdAt: Date
   updatedAt: Date
   pocId: string
