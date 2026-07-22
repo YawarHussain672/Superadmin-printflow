@@ -411,15 +411,30 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     setTotalCost(itemsTotal + packingTotal + deliveryTotal)
   }
 
+  // Update collateral unit price and recalculate total
+  function updateCollateralUnitPrice(index: number, newUnitPrice: number) {
+    const updated = [...collaterals]
+    const item = updated[index]
+    item.unitPrice = newUnitPrice
+    item.totalPrice = newUnitPrice * item.quantity
+    if (item.gstRate !== undefined) {
+      item.gstAmount = item.totalPrice * (item.gstRate / 100)
+    }
+    setCollaterals(updated)
+    updateTotalCost(updated)
+  }
+
   // Update collateral quantity and recalculate price
   function updateCollateralQuantity(index: number, newQuantity: number) {
     const updated = [...collaterals]
     const item = updated[index]
     item.quantity = newQuantity
-    const newUnitPrice = getUnitPriceFromRateCard(item.itemName, newQuantity)
-    // Only update price if rate card lookup succeeds, otherwise keep original
-    if (newUnitPrice > 0) {
-      item.unitPrice = newUnitPrice
+    // If unit price is not set, look up from rate card; otherwise preserve existing unit price (e.g. manual Admin override)
+    if (!item.unitPrice || item.unitPrice <= 0) {
+      const newUnitPrice = getUnitPriceFromRateCard(item.itemName, newQuantity)
+      if (newUnitPrice > 0) {
+        item.unitPrice = newUnitPrice
+      }
     }
     item.totalPrice = item.unitPrice * newQuantity
     if (item.gstRate !== undefined) {
@@ -516,6 +531,8 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
             id: c.id,
             itemName: c.itemName,
             quantity: c.quantity,
+            unitPrice: c.unitPrice,
+            totalPrice: c.totalPrice,
             specification: c.specification || "",
           })),
           // Packing charges
@@ -1070,34 +1087,56 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                               style={{ flex: 1.2, fontSize: '13px', padding: '8px 12px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box' }}
                             />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <input
-                                type="number"
-                                className="form-input"
-                                value={item.quantity || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value
-                                  if (val === '') {
-                                    // Allow empty input temporarily
-                                    const updated = [...collaterals]
-                                    updated[index] = { ...item, quantity: 0, totalPrice: 0 }
-                                    setCollaterals(updated)
-                                    updateTotalCost(updated)
-                                  } else {
-                                    const num = parseInt(val)
-                                    if (!isNaN(num) && num >= 0) {
-                                      updateCollateralQuantity(index, num)
+                              {isAdmin && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <span style={{ fontSize: '10px', color: 'var(--gray-500)', fontWeight: 600 }}>Rate / Unit</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className="form-input"
+                                    value={item.unitPrice || ''}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0
+                                      updateCollateralUnitPrice(index, val)
+                                    }}
+                                    placeholder="Rate"
+                                    style={{ width: '100px', marginBottom: 0, textAlign: 'center', height: '38.5px', boxSizing: 'border-box', fontFamily: 'var(--font-mono)' }}
+                                    title="Edit Rate / Unit (Admin Only)"
+                                  />
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {isAdmin && <span style={{ fontSize: '10px', color: 'var(--gray-500)', fontWeight: 600 }}>Qty</span>}
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  value={item.quantity || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    if (val === '') {
+                                      // Allow empty input temporarily
+                                      const updated = [...collaterals]
+                                      updated[index] = { ...item, quantity: 0, totalPrice: 0 }
+                                      setCollaterals(updated)
+                                      updateTotalCost(updated)
+                                    } else {
+                                      const num = parseInt(val)
+                                      if (!isNaN(num) && num >= 0) {
+                                        updateCollateralQuantity(index, num)
+                                      }
                                     }
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const val = parseInt(e.target.value)
-                                  if (isNaN(val) || val < 1) {
-                                    updateCollateralQuantity(index, 1)
-                                  }
-                                }}
-                                min="1"
-                                style={{ width: '120px', marginBottom: 0, textAlign: 'center', height: '38.5px', boxSizing: 'border-box' }}
-                              />
+                                  }}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value)
+                                    if (isNaN(val) || val < 1) {
+                                      updateCollateralQuantity(index, 1)
+                                    }
+                                  }}
+                                  min="1"
+                                  style={{ width: '100px', marginBottom: 0, textAlign: 'center', height: '38.5px', boxSizing: 'border-box' }}
+                                />
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => removeCollateral(index)}

@@ -35,47 +35,57 @@ async function deleteS3Asset(url: string | null | undefined) {
   }
 }
 
-async function priceCollaterals(projectId: string, collaterals: Array<{ itemName: string; quantity: number; specification?: string | null }>) {
+async function priceCollaterals(
+  projectId: string | undefined,
+  collaterals: Array<{ itemName: string; quantity: number; unitPrice?: number; specification?: string | null }>,
+  isAdmin: boolean = false
+) {
   const priced = await Promise.all(collaterals.map(async (c) => {
     const calc = await calculateTotal(c.itemName, c.quantity)
-    if (calc !== null) {
-      return {
-        itemName: c.itemName,
-        quantity: c.quantity,
-        unitPrice: calc.unitPrice,
-        totalPrice: calc.subtotal,
-        gstRate: calc.gstRate,
-        gstAmount: calc.gst,
-        specification: c.specification || null,
+    let unitPrice: number
+    let gstRate: number
+    let totalPrice: number
+    let gstAmount: number
+
+    if (isAdmin && c.unitPrice !== undefined && typeof c.unitPrice === "number" && c.unitPrice >= 0) {
+      unitPrice = c.unitPrice
+      gstRate = calc?.gstRate ?? 18
+      totalPrice = c.quantity * unitPrice
+      gstAmount = totalPrice * (gstRate / 100)
+    } else if (calc !== null) {
+      unitPrice = calc.unitPrice
+      gstRate = calc.gstRate
+      totalPrice = calc.subtotal
+      gstAmount = calc.gst
+    } else if (projectId) {
+      // Fallback to existing collateral price on project update if rate card is missing
+      const existingCollateral = await prisma.collateral.findFirst({
+        where: {
+          projectId,
+          itemName: c.itemName,
+        }
+      })
+      if (existingCollateral) {
+        unitPrice = existingCollateral.unitPrice
+        gstRate = existingCollateral.gstRate ?? 18
+        totalPrice = unitPrice * c.quantity
+        gstAmount = totalPrice * (gstRate / 100)
+      } else {
+        throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
       }
+    } else {
+      throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
     }
 
-    // Fallback to existing collateral price on project update if rate card is missing
-    const existingCollateral = await prisma.collateral.findFirst({
-      where: {
-        projectId,
-        itemName: c.itemName,
-      }
-    })
-
-    if (existingCollateral) {
-      const unitPrice = existingCollateral.unitPrice
-      const gstRate = existingCollateral.gstRate ?? 18
-      const totalPrice = unitPrice * c.quantity
-      const gstAmount = totalPrice * (gstRate / 100)
-
-      return {
-        itemName: c.itemName,
-        quantity: c.quantity,
-        unitPrice,
-        totalPrice,
-        gstRate,
-        gstAmount,
-        specification: c.specification || existingCollateral.specification,
-      }
+    return {
+      itemName: c.itemName,
+      quantity: c.quantity,
+      unitPrice,
+      totalPrice,
+      gstRate,
+      gstAmount,
+      specification: c.specification || null,
     }
-
-    throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
   }))
 
   return {
@@ -410,7 +420,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (collaterals !== undefined) {
       let priced: Awaited<ReturnType<typeof priceCollaterals>>
       try {
-        priced = await priceCollaterals(id, collaterals)
+        priced = await priceCollaterals(id, collaterals, isAdmin)
       } catch (error) {
         return NextResponse.json({
           error: error instanceof Error ? error.message : "Invalid collateral pricing",

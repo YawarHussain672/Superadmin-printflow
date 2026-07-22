@@ -202,6 +202,8 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
     if (collaterals.length > 1) setCollaterals(collaterals.filter((c) => c.id !== id))
   }
 
+  const isAdmin = session?.user?.role === "ADMIN"
+
   const updateCollateral = (id: string, field: keyof CollateralItem, value: string | number) => {
     setCollaterals(collaterals.map((c) => {
       if (c.id !== id) return c
@@ -223,8 +225,12 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
         if (item) {
           const price = getUnitPriceFromSlabs(item.volumeSlabs, Number(value))
           console.log("[DEBUG] Calculated price:", price, "for qty:", value)
+          // If unit price was not manually overridden (or when changing quantity), update from slabs
           updated.unitPrice = price ?? item.defaultPrice
         }
+      }
+      if (field === "unitPrice") {
+        updated.unitPrice = typeof value === "number" ? value : (parseFloat(value) || 0)
       }
       updated.totalPrice = updated.quantity * updated.unitPrice
       return updated
@@ -528,28 +534,42 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                     placeholder="0"
                     style={{ height: '38.5px', boxSizing: 'border-box', marginBottom: 0 }}
                   />
-                  <div
-                    title="Auto-set from rate card"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-start',
-                      height: '38.5px',
-                      padding: '0 12px',
-                      background: 'var(--gray-50)',
-                      border: '1px solid var(--gray-200)',
-                      borderRadius: '10px',
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
-                      color: collateral.unitPrice > 0 ? 'var(--gray-700)' : 'var(--gray-400)',
-                      fontSize: '13px',
-                      cursor: 'default',
-                      userSelect: 'none' as const,
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {collateral.unitPrice > 0 ? `₹${collateral.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                  </div>
+                  {isAdmin ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="form-input"
+                      value={collateral.unitPrice || ""}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateCollateral(collateral.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                      placeholder="Rate / Unit"
+                      style={{ height: '38.5px', boxSizing: 'border-box', marginBottom: 0, fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: '13px' }}
+                      title="Edit Rate / Unit (Admin Only)"
+                    />
+                  ) : (
+                    <div
+                      title="Auto-set from rate card"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        height: '38.5px',
+                        padding: '0 12px',
+                        background: 'var(--gray-50)',
+                        border: '1px solid var(--gray-200)',
+                        borderRadius: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        color: collateral.unitPrice > 0 ? 'var(--gray-700)' : 'var(--gray-400)',
+                        fontSize: '13px',
+                        cursor: 'default',
+                        userSelect: 'none' as const,
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      {collateral.unitPrice > 0 ? `₹${collateral.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '38.5px', padding: '0 8px', background: 'var(--gray-100)', borderRadius: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--gray-800)', fontSize: '13px', boxSizing: 'border-box', overflow: 'hidden' }}>
                     {formatCurrency(collateral.totalPrice)}
                   </div>

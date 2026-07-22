@@ -40,20 +40,39 @@ const createProjectSchema = z.object({
   })).min(1, "At least one collateral is required"),
 })
 
-async function priceCollaterals(collaterals: Array<{ itemName: string; quantity: number; specification?: string | null }>) {
+async function priceCollaterals(
+  collaterals: Array<{ itemName: string; quantity: number; unitPrice?: number; specification?: string | null }>,
+  isAdmin: boolean = false
+) {
   const priced = await Promise.all(collaterals.map(async (c) => {
     const calc = await calculateTotal(c.itemName, c.quantity)
-    if (calc === null) {
-      throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
+    let unitPrice: number
+    let gstRate: number
+    let totalPrice: number
+    let gstAmount: number
+
+    if (isAdmin && c.unitPrice !== undefined && typeof c.unitPrice === "number" && c.unitPrice >= 0) {
+      unitPrice = c.unitPrice
+      gstRate = calc?.gstRate ?? 18
+      totalPrice = c.quantity * unitPrice
+      gstAmount = totalPrice * (gstRate / 100)
+    } else {
+      if (calc === null) {
+        throw new Error(`No active rate card price found for ${c.itemName} at quantity ${c.quantity}`)
+      }
+      unitPrice = calc.unitPrice
+      gstRate = calc.gstRate
+      totalPrice = calc.subtotal
+      gstAmount = calc.gst
     }
 
     return {
       itemName: c.itemName,
       quantity: c.quantity,
-      unitPrice: calc.unitPrice,
-      totalPrice: calc.subtotal,
-      gstRate: calc.gstRate,
-      gstAmount: calc.gst,
+      unitPrice,
+      totalPrice,
+      gstRate,
+      gstAmount,
       specification: c.specification || null,
     }
   }))
@@ -235,7 +254,7 @@ export async function POST(request: NextRequest) {
 
     let priced: Awaited<ReturnType<typeof priceCollaterals>>
     try {
-      priced = await priceCollaterals(collaterals)
+      priced = await priceCollaterals(collaterals, session.user.role === "ADMIN")
     } catch (error) {
       const pricingError = error instanceof Error ? error.message : "Invalid collateral pricing"
       return NextResponse.json({
