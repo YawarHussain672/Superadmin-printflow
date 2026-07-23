@@ -41,15 +41,18 @@ async function priceCollaterals(
   isAdmin: boolean = false
 ) {
   const priced = await Promise.all(collaterals.map(async (c) => {
+    const rateCard = await prisma.rateCard.findFirst({
+      where: { itemName: c.itemName, active: true },
+      select: { gstRate: true },
+    })
     const calc = await calculateTotal(c.itemName, c.quantity)
     let unitPrice: number
-    let gstRate: number
+    let gstRate: number = rateCard?.gstRate ?? calc?.gstRate ?? 18
     let totalPrice: number
     let gstAmount: number
 
-    if (isAdmin && c.unitPrice !== undefined && typeof c.unitPrice === "number" && c.unitPrice >= 0) {
+    if (c.unitPrice !== undefined && typeof c.unitPrice === "number" && c.unitPrice >= 0) {
       unitPrice = c.unitPrice
-      gstRate = calc?.gstRate ?? 18
       totalPrice = c.quantity * unitPrice
       gstAmount = totalPrice * (gstRate / 100)
     } else if (calc !== null) {
@@ -197,7 +200,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const isOwner = existing.pocId === session.user.id
     const projectApprovedByAdmin = existing.approval?.status === "APPROVED" || !["REQUESTED", "CANCELLED"].includes(existing.status)
     const pocCanManageAfterApproval = isOwner && projectApprovedByAdmin
-    const isStatusUpdate = status !== undefined
+    const isStatusChange = status !== undefined && status.toUpperCase() !== existing.status.toUpperCase()
     const isDispatchUpdate = dispatch !== undefined
     const isProjectDetailsUpdate = [
       name,
@@ -283,12 +286,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Project cannot be edited once it has been submitted for approval" }, { status: 403 })
     }
 
-    if ((isStatusUpdate || isDispatchUpdate) && !isAdmin && !isOwner) {
+    if ((isStatusChange || isDispatchUpdate) && !isAdmin && !isOwner) {
       return NextResponse.json({ error: "You can only update status or dispatch for your own projects" }, { status: 403 })
     }
 
-    if ((isStatusUpdate || isDispatchUpdate) && !isAdmin && !pocCanManageAfterApproval) {
-      return NextResponse.json({ error: "POCs can update status or dispatch only after admin approves the project" }, { status: 403 })
+    if ((isStatusChange || isDispatchUpdate) && !isAdmin && !pocCanManageAfterApproval) {
+      return NextResponse.json({ error: "POCs can update status or dispatch only after admin approves the project and verifies the PI" }, { status: 403 })
     }
 
     // POC cannot modify collaterals after submission

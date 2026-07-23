@@ -45,15 +45,18 @@ async function priceCollaterals(
   isAdmin: boolean = false
 ) {
   const priced = await Promise.all(collaterals.map(async (c) => {
+    const rateCard = await prisma.rateCard.findFirst({
+      where: { itemName: c.itemName, active: true },
+      select: { gstRate: true },
+    })
     const calc = await calculateTotal(c.itemName, c.quantity)
     let unitPrice: number
-    let gstRate: number
+    let gstRate: number = rateCard?.gstRate ?? calc?.gstRate ?? 18
     let totalPrice: number
     let gstAmount: number
 
-    if (isAdmin && c.unitPrice !== undefined && typeof c.unitPrice === "number" && c.unitPrice >= 0) {
+    if (c.unitPrice !== undefined && typeof c.unitPrice === "number" && c.unitPrice >= 0) {
       unitPrice = c.unitPrice
-      gstRate = calc?.gstRate ?? 18
       totalPrice = c.quantity * unitPrice
       gstAmount = totalPrice * (gstRate / 100)
     } else {

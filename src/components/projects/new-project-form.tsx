@@ -293,6 +293,8 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
           collaterals: collaterals.filter((c) => c.itemName && c.quantity > 0).map(c => ({
             itemName: c.itemName,
             quantity: c.quantity,
+            unitPrice: c.unitPrice,
+            totalPrice: c.totalPrice,
             specification: c.specification || "",
           })),
           totalCost: totalCost,

@@ -950,19 +950,20 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 canDelete={isAdmin}
               />
 
-              {/* Payment Captured Details */}
-              <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--gray-200)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              {/* Payment Information */}
+              <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--gray-200)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--gray-900)' }}>
-                    Payment Captured Details
+                    Payment Information
                   </h4>
                   {project.paymentCaptured ? (
                     <span
                       style={{
-                        padding: '4px 10px',
+                        padding: '4px 12px',
                         borderRadius: '9999px',
                         backgroundColor: '#ecfdf5',
-                        color: '#059669',
+                        color: '#047857',
+                        border: '1px solid #a7f3d0',
                         fontSize: '12px',
                         fontWeight: 700,
                         display: 'inline-flex',
@@ -975,10 +976,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   ) : (
                     <span
                       style={{
-                        padding: '4px 10px',
+                        padding: '4px 12px',
                         borderRadius: '9999px',
-                        backgroundColor: '#fef3c7',
-                        color: '#d97706',
+                        backgroundColor: '#fffbeb',
+                        color: '#b45309',
+                        border: '1px solid #fde68a',
                         fontSize: '12px',
                         fontWeight: 700,
                       }}
@@ -991,67 +993,68 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 {project.paymentCaptured ? (
                   <div
                     style={{
-                      padding: '16px',
-                      backgroundColor: 'var(--gray-50, #f8fafc)',
-                      borderRadius: '10px',
-                      border: '1px solid var(--gray-200, #e2e8f0)',
+                      padding: '18px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '12px',
+                      gap: '14px',
                     }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', fontSize: '13px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', fontSize: '13px' }}>
                       <div>
-                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block' }}>TRANSACTION / REF NO.</span>
-                        <strong style={{ color: 'var(--gray-900)', fontFamily: 'monospace' }}>
+                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '2px' }}>TRANSACTION / REF NO.</span>
+                        <strong style={{ color: 'var(--gray-900)', fontFamily: 'var(--font-mono, monospace)', fontSize: '13px' }}>
                           {project.paymentTxnId || "— (No Txn ID)"}
                         </strong>
                       </div>
                       <div>
-                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block' }}>CAPTURED ON</span>
+                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '2px' }}>CAPTURED ON</span>
                         <strong style={{ color: 'var(--gray-900)' }}>
                           {project.paymentCapturedAt ? formatDate(project.paymentCapturedAt) : "—"}
                         </strong>
                       </div>
                       <div>
-                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block' }}>GRAND TOTAL PAID</span>
-                        <strong style={{ color: '#059669', fontSize: '14px' }}>
+                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '2px' }}>AMOUNT PAID</span>
+                        <strong style={{ color: '#047857', fontSize: '15px' }}>
                           {formatCurrency(project.grandTotal || project.totalCost * 1.18)}
                         </strong>
                       </div>
                     </div>
 
                     {project.paymentNotes && (
-                      <div style={{ fontSize: '13px', borderTop: '1px dashed var(--gray-200)', paddingTop: '8px' }}>
-                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block' }}>NOTES</span>
+                      <div style={{ fontSize: '13px', borderTop: '1px dashed #cbd5e1', paddingTop: '10px' }}>
+                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '2px' }}>PAYMENT NOTES</span>
                         <span style={{ color: 'var(--gray-800)' }}>{project.paymentNotes}</span>
                       </div>
                     )}
 
                     {/* Payment Receipt File Card */}
                     {project.paymentReceiptUrl && (
-                      <div style={{ borderTop: '1px dashed var(--gray-200)', paddingTop: '10px' }}>
-                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>PAYMENT RECEIPT / PROOF</span>
+                      <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
+                        <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>PAYMENT RECEIPT / PROOF</span>
                         <div
-                          className="doc-item"
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: '10px 14px',
+                            padding: '12px 16px',
                             background: 'white',
-                            borderRadius: '8px',
-                            border: '1px solid var(--gray-200)',
+                            borderRadius: '10px',
+                            border: '1px solid #e2e8f0',
+                            gap: '12px',
+                            flexWrap: 'wrap',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
                             <div
                               style={{
-                                width: '32px',
-                                height: '32px',
-                                background: '#059669',
+                                width: '36px',
+                                height: '36px',
+                                background: '#047857',
                                 color: 'white',
-                                borderRadius: '6px',
+                                borderRadius: '8px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1060,14 +1063,14 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                                 flexShrink: 0,
                               }}
                             >
-                              FILE
+                              PROOF
                             </div>
                             <div style={{ overflow: 'hidden' }}>
                               <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--gray-900)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                 {project.paymentReceiptFilename || "Payment_Receipt"}
                               </div>
                               <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
-                                Uploaded with payment capture
+                                Uploaded proof receipt
                               </div>
                             </div>
                           </div>
@@ -1076,7 +1079,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                             target="_blank"
                             rel="noreferrer"
                             className="btn btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'var(--axis-primary)' }}
+                            style={{ padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: 'var(--axis-primary)' }}
                           >
                             <DownloadIcon /> View / Download
                           </a>
@@ -1085,10 +1088,27 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                     )}
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', backgroundColor: 'var(--gray-50)', borderRadius: '8px', border: '1px dashed var(--gray-300)' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--gray-600)' }}>
-                      No payment has been captured for this project yet.
-                    </span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px 20px',
+                      backgroundColor: '#fffbeb',
+                      borderRadius: '12px',
+                      border: '1px solid #fde68a',
+                      gap: '16px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>
+                        No payment has been captured for this project yet.
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#b45309' }}>
+                        Mark payment as captured and optionally upload proof receipt.
+                      </span>
+                    </div>
                     {(isAdmin || session?.user?.role === "POC") && (
                       <CapturePaymentModal
                         projectId={project.id}
