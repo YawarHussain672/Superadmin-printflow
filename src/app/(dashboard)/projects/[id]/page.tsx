@@ -1023,7 +1023,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                       </div>
                     </div>
 
-                    {project.paymentNotes && (
+                    {!isClient && project.paymentNotes && (
                       <div style={{ fontSize: '13px', borderTop: '1px dashed #cbd5e1', paddingTop: '10px' }}>
                         <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: '2px' }}>PAYMENT NOTES</span>
                         <span style={{ color: 'var(--gray-800)' }}>{project.paymentNotes}</span>
