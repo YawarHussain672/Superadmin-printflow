@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { TeamActions } from "@/components/team/team-actions"
 import { toast } from "sonner"
+import { FileSpreadsheet } from "lucide-react"
+import { exportToExcel } from "@/utils/excel-export"
 
 interface TeamMember {
   id: string
@@ -97,15 +99,78 @@ export default function TeamPage() {
     return new Date(date).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })
   }
 
+  const handleExportExcel = async () => {
+    if (members.length === 0) {
+      toast.error("No team members to export")
+      return
+    }
+
+    const columns = [
+      { header: "Name", key: "name", width: 24 },
+      { header: "Email", key: "email", width: 28 },
+      { header: "Phone", key: "phone", width: 18 },
+      { header: "Location", key: "location", width: 18 },
+      { header: "Branch", key: "branch", width: 18 },
+      { header: "Role", key: "role", width: 14 },
+      { header: "Status", key: "status", width: 14 },
+      { header: "Joined Date", key: "joinedDate", width: 16 },
+    ]
+
+    const data = members.map((member) => ({
+      name: member.name,
+      email: member.email || "—",
+      phone: member.phone || "—",
+      location: member.location || "—",
+      branch: member.branch || "—",
+      role: member.role,
+      status: member.active ? "Active" : "Inactive",
+      joinedDate: member.createdAt ? formatJoinedDate(member.createdAt) : "—",
+    }))
+
+    await exportToExcel({
+      filename: "Team_and_Roles_Report",
+      sheetName: "Team Members",
+      columns,
+      data,
+    })
+    toast.success(`Exported ${members.length} team members to Excel!`)
+  }
+
   return (
     <div style={{ display: 'inline-block', minWidth: 'max-content', width: '100%', verticalAlign: 'top' }}>
       {/* Page Header */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 className="page-title">Team & Roles</h1>
           <p className="page-subtitle">Manage POCs and team members</p>
         </div>
-        <TeamActions mode="add" onSuccess={handleMemberAdded} />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleExportExcel}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '42px',
+              padding: '0 16px',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              backgroundColor: 'var(--axis-primary, #003c71)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              boxShadow: '0 2px 6px rgba(0, 60, 113, 0.25)',
+            }}
+          >
+            <FileSpreadsheet size={16} />
+            Export to Excel
+          </button>
+          <TeamActions mode="add" onSuccess={handleMemberAdded} />
+        </div>
       </div>
 
       {/* Team Table Card */}

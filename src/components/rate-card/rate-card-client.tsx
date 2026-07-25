@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { FileSpreadsheet } from "lucide-react"
+import { exportToExcel } from "@/utils/excel-export"
 
 type VolumeSlab = { slab: string; price: number }
 interface RateCardItem { id: string; itemName: string; subcategory: string | null; specification: string; volumeSlabs: unknown; gstRate: number; active: boolean }
@@ -280,16 +282,80 @@ export function RateCardClient({ initialItems }: RateCardClientProps) {
     }
   }
 
+  const handleExportExcel = async () => {
+    if (items.length === 0) {
+      toast.error("No rate card items to export")
+      return
+    }
+
+    const columns = [
+      { header: "S.No", key: "sno", width: 10 },
+      { header: "Item Name", key: "itemName", width: 28 },
+      { header: "Subcategory", key: "subcategory", width: 20 },
+      { header: "Specification", key: "specification", width: 35 },
+      { header: "GST Rate (%)", key: "gstRate", width: 14 },
+      { header: "Pricing Slabs (Qty: Price)", key: "pricingSlabs", width: 45 },
+    ]
+
+    const data = items.map((item, index) => {
+      const slabs = getSlabs(item)
+      const slabsStr = Array.isArray(slabs) && slabs.length > 0
+        ? slabs.map((s) => `${s.slab}: ₹${s.price}`).join(" | ")
+        : "—"
+
+      return {
+        sno: index + 1,
+        itemName: item.itemName,
+        subcategory: item.subcategory || "—",
+        specification: item.specification || "—",
+        gstRate: `${item.gstRate ?? 18}%`,
+        pricingSlabs: slabsStr,
+      }
+    })
+
+    await exportToExcel({
+      filename: "Rate_Card_Master_Report",
+      sheetName: "Rate Card",
+      columns,
+      data,
+    })
+    toast.success(`Exported ${items.length} rate card items to Excel!`)
+  }
+
   return (
     <div>
       {/* Page Header */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 className="page-title">Rate Card Management</h1>
           <p className="page-subtitle">View and edit pricing for all collaterals</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-primary" onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleExportExcel}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '42px',
+              padding: '0 16px',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              backgroundColor: 'var(--axis-primary, #003c71)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              boxShadow: '0 2px 6px rgba(0, 60, 113, 0.25)',
+            }}
+          >
+            <FileSpreadsheet size={16} />
+            Export to Excel
+          </button>
+          <button className="btn btn-primary" onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px' }}>
             <PlusIcon /> Add Item
           </button>
         </div>
