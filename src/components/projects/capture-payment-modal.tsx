@@ -93,14 +93,14 @@ export function CapturePaymentModal({
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            background: "var(--axis-primary, #003c71)",
             color: "white",
             border: "none",
             borderRadius: "var(--radius-md, 8px)",
             padding: "8px 16px",
             fontWeight: 600,
             cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
+            boxShadow: "0 2px 8px rgba(0, 60, 113, 0.25)",
             ...buttonStyle,
           }}
           onClick={handleOpen}
@@ -158,8 +158,8 @@ export function CapturePaymentModal({
                     width: "36px",
                     height: "36px",
                     borderRadius: "10px",
-                    backgroundColor: "#ecfdf5",
-                    color: "#059669",
+                    backgroundColor: "rgba(0, 168, 204, 0.12)",
+                    color: "var(--axis-primary, #003c71)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -199,8 +199,8 @@ export function CapturePaymentModal({
               {grandTotal !== undefined && grandTotal > 0 && (
                 <div
                   style={{
-                    backgroundColor: "#f0fdf4",
-                    border: "1px solid #bbf7d0",
+                    backgroundColor: "rgba(0, 60, 113, 0.04)",
+                    border: "1px solid rgba(0, 168, 204, 0.25)",
                     borderRadius: "10px",
                     padding: "12px 16px",
                     marginBottom: "20px",
@@ -209,8 +209,8 @@ export function CapturePaymentModal({
                     justifyContent: "space-between",
                   }}
                 >
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#166534" }}>Amount Due / Paid:</span>
-                  <span style={{ fontSize: "18px", fontWeight: 800, color: "#15803d" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--axis-primary, #003c71)" }}>Amount Due / Paid:</span>
+                  <span style={{ fontSize: "18px", fontWeight: 800, color: "var(--axis-primary, #003c71)" }}>
                     ₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -263,11 +263,11 @@ export function CapturePaymentModal({
                 </label>
                 <div
                   style={{
-                    border: selectedFile ? "1px solid #10b981" : "2px dashed var(--gray-300, #cbd5e1)",
+                    border: selectedFile ? "1px solid var(--axis-accent, #00a8cc)" : "2px dashed var(--gray-300, #cbd5e1)",
                     borderRadius: "8px",
                     padding: "14px",
                     textAlign: "center",
-                    backgroundColor: selectedFile ? "#f0fdf4" : "#f8fafc",
+                    backgroundColor: selectedFile ? "rgba(0, 168, 204, 0.06)" : "#f8fafc",
                     position: "relative",
                     transition: "all 0.2s",
                   }}
@@ -294,8 +294,8 @@ export function CapturePaymentModal({
                   {selectedFile ? (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
-                        <FileText size={18} color="#059669" />
-                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#065f46", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                        <FileText size={18} color="var(--axis-accent, #00a8cc)" />
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--axis-primary, #003c71)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                           {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                         </span>
                       </div>
@@ -390,7 +390,7 @@ export function CapturePaymentModal({
                     padding: "10px 20px",
                     borderRadius: "8px",
                     border: "none",
-                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    background: "var(--axis-primary, #003c71)",
                     color: "white",
                     fontWeight: 600,
                     fontSize: "14px",
@@ -398,7 +398,7 @@ export function CapturePaymentModal({
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                    boxShadow: "0 4px 12px rgba(0, 60, 113, 0.25)",
                   }}
                 >
                   {isSubmitting ? (

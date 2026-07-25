@@ -850,15 +850,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   />
                 </div>
               )}
-              {/* Payment Reminder Button - Admin only, for delivered projects */}
-              {isAdmin && project.status === 'DELIVERED' && project.files.some(f => f.type === 'INVOICE') && (
+              {/* Payment Reminder Button - Admin only, for delivered projects with pending payment */}
+              {isAdmin && project.status === 'DELIVERED' && !project.paymentCaptured && project.files.some(f => f.type === 'INVOICE') && (
                 <div style={{ marginTop: '16px' }}>
                   <button
                     type="button"
                     className="btn btn-secondary"
                     style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                     onClick={async () => {
-                      if (!confirm('Are you sure you want to send a payment reminder email to the POC?')) return
+                      if (!confirm('Are you sure you want to send a payment reminder email for this project?')) return
 
                       try {
                         const res = await fetch(`/api/projects/${project.id}/payment-reminder`, {
@@ -1094,18 +1094,18 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '16px 20px',
-                      backgroundColor: '#fffbeb',
+                      backgroundColor: 'rgba(0, 60, 113, 0.04)',
                       borderRadius: '12px',
-                      border: '1px solid #fde68a',
+                      border: '1px solid rgba(0, 168, 204, 0.25)',
                       gap: '16px',
                       flexWrap: 'wrap',
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--axis-primary)' }}>
                         No payment has been captured for this project yet.
                       </span>
-                      <span style={{ fontSize: '11px', color: '#b45309' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--gray-600)' }}>
                         Mark payment as captured and optionally upload proof receipt.
                       </span>
                     </div>

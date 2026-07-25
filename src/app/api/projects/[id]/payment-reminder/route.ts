@@ -22,11 +22,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Only admins can send payment reminders" }, { status: 403 })
     }
 
-    // Get project with POC and invoice details
+    // Get project with POC, Client, and invoice details
     const project = await prisma.project.findUnique({
       where: { id },
       include: {
         poc: true,
+        client: true,
         files: {
           where: { type: "INVOICE" },
           orderBy: { uploadedAt: "desc" },
@@ -39,8 +40,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
 
-    if (!project.poc?.email) {
-      return NextResponse.json({ error: "POC email not found" }, { status: 400 })
+    // Collect recipient emails (POC and Client if assigned)
+    const recipients: string[] = []
+    if (project.poc?.email) recipients.push(project.poc.email)
+    if (project.client?.email && !recipients.includes(project.client.email)) {
+      recipients.push(project.client.email)
+    }
+
+    if (recipients.length === 0) {
+      return NextResponse.json({ error: "No recipient email address found" }, { status: 400 })
     }
 
     // Check if project is delivered (only send reminders for delivered projects)
@@ -72,17 +80,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }, { status: 400 })
     }
 
-    // Send the payment reminder email
-    await sendOutstandingPaymentReminderEmail(project.poc.email, {
-      pocName: project.poc.name,
-      projectName: project.name,
-      invoiceNumber: invoiceNumber,
-      invoiceDate: invoiceDate,
-      outstandingAmount: formatCurrency(project.grandTotal || project.totalCost * 1.18),
-      appUrl: APP_URL,
-      referenceType: referenceType, // Add this to email data
-      projectId: project.id,
-    })
+    const formattedAmount = formatCurrency(project.grandTotal || project.totalCost * 1.18)
+
+    // Send the payment reminder email to recipients (POC & Client if present)
+    for (const recipientEmail of recipients) {
+      const recipientName = (recipientEmail === project.client?.email ? project.client.name : project.poc?.name) || "Customer"
+      await sendOutstandingPaymentReminderEmail(recipientEmail, {
+        pocName: recipientName,
+        projectName: project.name,
+        invoiceNumber: invoiceNumber,
+        invoiceDate: invoiceDate,
+        outstandingAmount: formattedAmount,
+        appUrl: APP_URL,
+        referenceType: referenceType,
+        projectId: project.id,
+      })
+    }
 
     // Log the activity
     await logActivity({
@@ -91,7 +104,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       entityType: "project",
       entityId: id,
       details: {
-        pocEmail: project.poc.email,
+        recipients: recipients.join(", "),
+        pocEmail: project.poc?.email,
+        clientEmail: project.client?.email,
         referenceType: referenceType,
         invoiceNumber: invoiceNumber,
         outstandingAmount: project.grandTotal || project.totalCost * 1.18

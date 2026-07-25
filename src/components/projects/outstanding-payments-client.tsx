@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Search, CreditCard, Mail, Loader2, Eye, FileText, DollarSign, Calendar, UserCheck } from "lucide-react"
+import { Search, CreditCard, Mail, Loader2, Eye, FileText, IndianRupee, Calendar, UserCheck, FileSpreadsheet, Download } from "lucide-react"
 import { formatDate, formatCurrency } from "@/utils/formatters"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { CapturePaymentModal } from "@/components/projects/capture-payment-modal"
+import { exportToExcel } from "@/utils/excel-export"
 
 interface Collateral {
   id: string
@@ -98,6 +99,53 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
     }
   }
 
+  // Export to Excel handler (respects active search / filters)
+  const handleExportExcel = async () => {
+    if (filteredProjects.length === 0) {
+      toast.error("No outstanding payment records to export")
+      return
+    }
+
+    const columns = [
+      { header: "Project ID", key: "projectId", width: 18 },
+      { header: "Project Name", key: "projectName", width: 26 },
+      { header: "Status", key: "status", width: 16 },
+      { header: "Assigned POC", key: "pocName", width: 22 },
+      { header: "Client", key: "clientName", width: 22 },
+      { header: "Location", key: "location", width: 18 },
+      { header: "Branch", key: "branch", width: 18 },
+      { header: "Delivery Date", key: "deliveryDate", width: 16 },
+      { header: "Tax Invoice", key: "invoice", width: 22 },
+      { header: "Outstanding Amount (₹)", key: "grandTotal", width: 22 },
+    ]
+
+    const data = filteredProjects.map((p) => {
+      const invoiceFile = p.files.find((f) => f.type === "INVOICE")
+      const grandTotal = p.grandTotal || p.totalCost * 1.18
+
+      return {
+        projectId: p.projectId,
+        projectName: p.name,
+        status: p.status,
+        pocName: p.poc?.name || p.pocName || "Not Assigned",
+        clientName: p.client?.name || p.clientName || "Not Assigned",
+        location: p.location || "—",
+        branch: p.branch || "—",
+        deliveryDate: p.deliveryDate ? formatDate(p.deliveryDate) : "—",
+        invoice: invoiceFile ? invoiceFile.filename : "Generated",
+        grandTotal: grandTotal,
+      }
+    })
+
+    await exportToExcel({
+      filename: searchQuery.trim() ? `Outstanding_Payments_${searchQuery.trim().replace(/\s+/g, "_")}` : "Outstanding_Payments_Report",
+      sheetName: "Outstanding Payments",
+      columns,
+      data,
+    })
+    toast.success(`Exported ${filteredProjects.length} filtered outstanding payment records to Excel!`)
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {/* Header */}
@@ -131,8 +179,8 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
               width: "48px",
               height: "48px",
               borderRadius: "12px",
-              backgroundColor: "#fef3c7",
-              color: "#d97706",
+              backgroundColor: "rgba(0, 60, 113, 0.1)",
+              color: "var(--axis-primary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -155,8 +203,8 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
           style={{
             padding: "20px",
             borderRadius: "14px",
-            background: "linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%)",
-            border: "1px solid #a7f3d0",
+            background: "linear-gradient(135deg, #ffffff 0%, rgba(0, 168, 204, 0.08) 100%)",
+            border: "1px solid rgba(0, 168, 204, 0.25)",
             display: "flex",
             alignItems: "center",
             gap: "16px",
@@ -167,20 +215,20 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
               width: "48px",
               height: "48px",
               borderRadius: "12px",
-              backgroundColor: "#d1fae5",
-              color: "#059669",
+              backgroundColor: "rgba(0, 168, 204, 0.15)",
+              color: "var(--axis-primary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <DollarSign size={24} />
+            <IndianRupee size={24} />
           </div>
           <div>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "#047857", textTransform: "uppercase" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--axis-primary)", textTransform: "uppercase" }}>
               Total Outstanding Balance
             </span>
-            <h3 style={{ margin: "2px 0 0", fontSize: "24px", fontWeight: 800, color: "#065f46" }}>
+            <h3 style={{ margin: "2px 0 0", fontSize: "24px", fontWeight: 800, color: "var(--axis-primary)" }}>
               {formatCurrency(totalOutstandingAmount)}
             </h3>
           </div>
@@ -220,6 +268,31 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
               }}
             />
           </div>
+
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="btn btn-primary"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 16px",
+              height: "38px",
+              fontSize: "13px",
+              fontWeight: 600,
+              borderRadius: "8px",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              backgroundColor: "var(--axis-primary, #003c71)",
+              color: "white",
+              border: "none",
+              boxShadow: "0 2px 6px rgba(0, 60, 113, 0.25)",
+            }}
+          >
+            <FileSpreadsheet size={16} />
+            Export to Excel
+          </button>
         </div>
       </div>
 
@@ -258,7 +331,7 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
                   display: "flex",
                   flexDirection: "column",
                   gap: "16px",
-                  borderLeft: "4px solid #f59e0b",
+                  borderLeft: "4px solid var(--axis-accent)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
@@ -283,7 +356,7 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
                     <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--gray-500)", textTransform: "uppercase" }}>
                       Outstanding Amount
                     </span>
-                    <div style={{ fontSize: "22px", fontWeight: 800, color: "#15803d", marginTop: "2px" }}>
+                    <div style={{ fontSize: "22px", fontWeight: 800, color: "var(--axis-primary)", marginTop: "2px" }}>
                       {formatCurrency(grandTotal)}
                     </div>
                   </div>
@@ -302,12 +375,22 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
                 >
                   <div>
                     <span style={{ color: "var(--gray-500)", display: "block", fontSize: "11px", fontWeight: 600 }}>CLIENT</span>
-                    <strong style={{ color: "var(--gray-800)" }}>{project.client?.name || project.clientName || "—"}</strong>
-                    {project.branch && <span style={{ color: "var(--gray-500)" }}> ({project.branch})</span>}
+                    {project.client?.name || project.clientName ? (
+                      <>
+                        <strong style={{ color: "var(--gray-800)" }}>{project.client?.name || project.clientName}</strong>
+                        {project.branch && <span style={{ color: "var(--gray-500)" }}> ({project.branch})</span>}
+                      </>
+                    ) : (
+                      <span style={{ color: "var(--gray-500)", fontWeight: 500 }}>
+                        Not Assigned
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span style={{ color: "var(--gray-500)", display: "block", fontSize: "11px", fontWeight: 600 }}>ASSIGNED POC</span>
-                    <strong style={{ color: "var(--gray-800)" }}>{project.poc?.name || project.pocName || "—"}</strong>
+                    <strong style={{ color: project.poc?.name || project.pocName ? "var(--gray-800)" : "var(--gray-500)", fontWeight: project.poc?.name || project.pocName ? 700 : 500 }}>
+                      {project.poc?.name || project.pocName || "Not Assigned"}
+                    </strong>
                   </div>
                   <div>
                     <span style={{ color: "var(--gray-500)", display: "block", fontSize: "11px", fontWeight: 600 }}>TAX INVOICE</span>

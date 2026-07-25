@@ -128,8 +128,10 @@ export async function GET(request: NextRequest) {
           }
         ]
       })
-    } else if (poc && poc !== "all") {
-      // Admin filtering by specific POC
+    }
+
+    // Filtering by specific POC
+    if (poc && poc !== "all") {
       conditions.push({ pocId: poc })
     }
 
@@ -141,8 +143,11 @@ export async function GET(request: NextRequest) {
           { projectId: { contains: q, mode: "insensitive" } },
           { name: { contains: q, mode: "insensitive" } },
           { location: { contains: q, mode: "insensitive" } },
+          { branch: { contains: q, mode: "insensitive" } },
           { poc: { name: { contains: q, mode: "insensitive" } } },
+          { client: { name: { contains: q, mode: "insensitive" } } },
           { dispatch: { trackingId: { contains: q, mode: "insensitive" } } },
+          { collaterals: { some: { itemName: { contains: q, mode: "insensitive" } } } },
         ]
       })
     }

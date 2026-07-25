@@ -11,6 +11,9 @@ import { MaterialCell } from "@/components/ui/material-cell"
 import { toast } from "sonner"
 import { CITIES } from "@/lib/branch-locations"
 import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
+import { exportToExcel } from "@/utils/excel-export"
+import { formatDate, formatCurrency } from "@/utils/formatters"
+import { Search } from "lucide-react"
 
 const PAGE_SIZE = 20
 
@@ -220,24 +223,118 @@ export function ProjectsPageClient() {
     }
   }
 
+  const handleExportExcel = async () => {
+    if (projects.length === 0) {
+      toast.error("No projects found to export")
+      return
+    }
+
+    const columns = [
+      { header: "Project ID", key: "projectId", width: 18 },
+      { header: "Project Name", key: "projectName", width: 26 },
+      { header: "Status", key: "status", width: 16 },
+      { header: "Assigned POC", key: "pocName", width: 22 },
+      { header: "Client", key: "clientName", width: 22 },
+      { header: "Location", key: "location", width: 18 },
+      { header: "Branch", key: "branch", width: 18 },
+      { header: "Materials / Items", key: "materials", width: 32 },
+      { header: "Delivery Date", key: "deliveryDate", width: 16 },
+      { header: "Base Cost (₹)", key: "totalCost", width: 16 },
+      { header: "Grand Total (₹)", key: "grandTotal", width: 18 },
+    ]
+
+    const data = projects.map((p) => {
+      const materialsStr = p.collaterals && p.collaterals.length > 0
+        ? p.collaterals.map((c) => `${c.itemName} (Qty: ${c.quantity})`).join(", ")
+        : "—"
+
+      return {
+        projectId: p.projectId,
+        projectName: p.name,
+        status: p.status,
+        pocName: p.poc?.name || p.pocName || "Not Assigned",
+        clientName: p.client?.name || p.clientName || "Not Assigned",
+        location: p.location || "—",
+        branch: p.branch || "—",
+        materials: materialsStr,
+        deliveryDate: p.deliveryDate ? formatDate(p.deliveryDate) : "—",
+        totalCost: p.totalCost,
+        grandTotal: p.grandTotal || p.totalCost * 1.18,
+      }
+    })
+
+    let filterLabel = ""
+    if (params.poc) {
+      const pObj = pocs.find((poc) => poc.id === params.poc)
+      if (pObj) filterLabel += `_${pObj.name.replace(/\s+/g, "_")}`
+    }
+    if (params.status) filterLabel += `_${params.status}`
+    if (params.location) filterLabel += `_${params.location}`
+
+    await exportToExcel({
+      filename: `Projects_Report${filterLabel}`,
+      sheetName: "Projects",
+      columns,
+      data,
+    })
+    toast.success(`Exported ${projects.length} filtered project records to Excel!`)
+  }
+
+  const [searchInput, setSearchInput] = useState(params.search)
+
+  useEffect(() => {
+    setSearchInput(params.search)
+  }, [params.search])
+
   return (
     <div style={{ display: 'inline-block', minWidth: 'max-content', width: '100%', verticalAlign: 'top' }}>
       {/* Page Header */}
       <div className="page-header">
-        <h1 className="page-title">All Projects</h1>
+        <h1 className="page-title">{isClient ? "My Projects" : "All Projects"}</h1>
         <p className="page-subtitle">Complete project list with advanced filtering</p>
       </div>
 
       <div style={{ minWidth: '980px', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Filters */}
         <div className="card" style={{ margin: 0 }}>
-          <div style={{ padding: '20px', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-          {!isPoc && (
+          <div style={{ padding: '20px', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search Box */}
+            <div style={{ position: "relative", width: "240px" }}>
+              <Search
+                size={16}
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--gray-400)",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search project ID, name..."
+                value={searchInput}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setSearchInput(val)
+                  router.push(buildUrl({ search: val, page: "1" }))
+                }}
+                className="form-input"
+                style={{
+                  paddingLeft: "36px",
+                  marginBottom: 0,
+                  fontSize: "13px",
+                  height: "42px",
+                }}
+              />
+            </div>
+
+            {!isPoc && (
             <select
               className="form-select"
               style={{ width: '200px' }}
               value={params.poc}
-              onChange={(e) => router.push(buildUrl({ poc: e.target.value }))}
+              onChange={(e) => router.push(buildUrl({ poc: e.target.value, page: "1" }))}
             >
               <option value="">All POCs</option>
               {pocs.map((poc) => (
@@ -245,11 +342,13 @@ export function ProjectsPageClient() {
               ))}
             </select>
           )}
+
+          {/* Status Select */}
           <select
             className="form-select"
             style={{ width: '200px' }}
             value={params.status}
-            onChange={(e) => router.push(buildUrl({ status: e.target.value }))}
+            onChange={(e) => router.push(buildUrl({ status: e.target.value, page: "1" }))}
           >
             <option value="">All Status</option>
             <option value="REQUESTED">Requested</option>
@@ -259,17 +358,49 @@ export function ProjectsPageClient() {
             <option value="DELIVERED">Delivered</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
+
+          {/* Location Select */}
           <select
             className="form-select"
             style={{ width: '200px' }}
             value={params.location}
-            onChange={(e) => router.push(buildUrl({ location: e.target.value }))}
+            onChange={(e) => router.push(buildUrl({ location: e.target.value, page: "1" }))}
           >
             <option value="">All Cities</option>
             {mergedLocations.map((city) => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
+
+          {/* Export to Excel - Hidden for CLIENT */}
+          {!isClient && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleExportExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginLeft: isClient ? 'auto' : undefined,
+                height: '42px',
+                padding: '0 16px',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                backgroundColor: 'var(--axis-primary, #003c71)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0 2px 6px rgba(0, 60, 113, 0.25)',
+              }}
+            >
+              Export to Excel
+            </button>
+          )}
+
+          {/* New Project Button */}
           {!isClient && (
             <button className="btn btn-primary" onClick={openNewProjectModal} style={{ marginLeft: 'auto' }}>
               <PlusIcon />

@@ -42,9 +42,18 @@ interface FileUploadButtonProps {
   isAdmin?: boolean
   canUpload?: boolean
   canDelete?: boolean
+  compact?: boolean
 }
 
-export function FileUploadButton({ projectId, fileType, label, existingFiles, isAdmin, canUpload, canDelete }: FileUploadButtonProps) {
+export function FileUploadButton({
+  projectId,
+  fileType,
+  label,
+  existingFiles,
+  isAdmin,
+  canUpload,
+  canDelete,
+}: FileUploadButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -95,7 +104,6 @@ export function FileUploadButton({ projectId, fileType, label, existingFiles, is
           const err = JSON.parse(text)
           errorMessage = err.error || "Upload failed"
         } catch {
-          // If not JSON, use status text or first part of HTML
           errorMessage = res.statusText || "Upload failed"
         }
         throw new Error(errorMessage)
@@ -103,46 +111,112 @@ export function FileUploadButton({ projectId, fileType, label, existingFiles, is
 
       setProgress(100)
       toast.success(`${label} uploaded successfully!`)
-      // Force page refresh to get updated file list from server
       window.location.reload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")
     } finally {
       setUploading(false)
       setProgress(0)
-      // Reset input so same file can be re-uploaded
       if (inputRef.current) inputRef.current.value = ""
     }
   }
 
+  const handleDownloadFile = async (f: { id: string; filename: string }) => {
+    try {
+      toast.loading("Downloading...", { id: `download-${f.id}` })
+      const res = await fetch(`/api/files/${f.id}/download`)
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(errorText || "Download failed")
+      }
+
+      const contentType = res.headers.get("content-type")
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || "Download failed")
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+
+      const a = document.createElement("a")
+      a.href = url
+      a.download = f.filename
+      a.style.display = "none"
+      document.body.appendChild(a)
+      a.click()
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      }, 100)
+
+      toast.success("Downloaded!", { id: `download-${f.id}` })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed", { id: `download-${f.id}` })
+    }
+  }
+
+  const handleDeleteFile = async (fId: string) => {
+    if (!confirm("Are you sure you want to delete this file?")) return
+    setDeleting(fId)
+    try {
+      const res = await fetch(`/api/files/${fId}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Delete failed")
+      }
+      toast.success("File deleted")
+      window.location.reload()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete file")
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   return (
-    <div className="doc-section" style={{ background: 'var(--gray-50)', padding: '16px', borderRadius: '10px', marginBottom: '16px' }}>
+    <div
+      className="doc-section"
+      style={{
+        background: "var(--gray-50, #f8fafc)",
+        border: "1px solid var(--gray-200, #e2e8f0)",
+        padding: "12px 14px",
+        borderRadius: "10px",
+        width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        marginBottom: "16px",
+      }}
+    >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h4 style={{ fontWeight: 700, fontSize: '14px', color: 'var(--gray-900)' }}>{label}</h4>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: existingFiles.length > 0 ? "8px" : "6px" }}>
+        <h4 style={{ fontWeight: 700, fontSize: "13px", color: "var(--axis-primary, #003c71)", margin: 0 }}>{label}</h4>
         {showUpload && (
           <>
             <button
+              type="button"
               onClick={() => inputRef.current?.click()}
               disabled={uploading}
               className="doc-upload-btn"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '10px',
-                background: 'var(--axis-primary)',
-                color: 'white',
-                fontSize: '13px',
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "7px 14px",
+                borderRadius: "8px",
+                background: "linear-gradient(135deg, var(--axis-primary, #003c71) 0%, #002a52 100%)",
+                color: "white",
+                fontSize: "12px",
                 fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
+                border: "none",
+                cursor: uploading ? "not-allowed" : "pointer",
                 opacity: uploading ? 0.6 : 1,
-                transition: 'background 0.2s'
+                boxShadow: "0 2px 6px rgba(0, 60, 113, 0.25)",
+                whiteSpace: "nowrap",
+                transition: "transform 0.15s, opacity 0.15s",
               }}
-              onMouseEnter={(e) => { if (!uploading) e.currentTarget.style.background = '#002a52' }}
-              onMouseLeave={(e) => { if (!uploading) e.currentTarget.style.background = 'var(--axis-primary)' }}
             >
               {uploading ? <LoaderIcon /> : <UploadIcon />}
               {uploading ? "Uploading..." : `Upload ${fileType}`}
@@ -160,128 +234,95 @@ export function FileUploadButton({ projectId, fileType, label, existingFiles, is
 
       {/* Progress bar */}
       {uploading && (
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ height: '6px', background: 'var(--gray-200)', borderRadius: '3px', overflow: 'hidden' }}>
+        <div style={{ marginBottom: "8px" }}>
+          <div style={{ height: "4px", background: "var(--gray-200)", borderRadius: "2px", overflow: "hidden" }}>
             <div
               style={{
-                height: '100%',
-                background: 'var(--axis-primary)',
-                borderRadius: '3px',
-                transition: 'width 0.3s',
-                width: `${progress}%`
+                height: "100%",
+                background: "var(--axis-primary)",
+                borderRadius: "2px",
+                transition: "width 0.3s",
+                width: `${progress}%`,
               }}
             />
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>{progress}% uploaded</p>
+          <p style={{ fontSize: "11px", color: "var(--gray-500)", marginTop: "2px", margin: 0 }}>{progress}% uploaded</p>
         </div>
       )}
 
       {/* Existing files */}
       {existingFiles.length > 0 ? (
-        <div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {existingFiles.map((f) => (
             <div
               key={f.id}
               className="doc-item"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                background: 'var(--gray-0)',
-                borderRadius: '6px',
-                border: '1px solid var(--gray-200)',
-                marginTop: '8px'
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 10px",
+                background: "white",
+                borderRadius: "6px",
+                border: "1px solid var(--gray-200)",
+                gap: "8px",
               }}
             >
-              <div className="doc-info" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="doc-icon" style={{
-                  width: '36px',
-                  height: '36px',
-                  background: 'var(--axis-primary)',
-                  color: 'white',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: '12px'
-                }}>
+              <div className="doc-info" style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", minWidth: 0 }}>
+                <div
+                  className="doc-icon"
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    background: "var(--axis-primary)",
+                    color: "white",
+                    borderRadius: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: "10px",
+                    flexShrink: 0,
+                  }}
+                >
                   PDF
                 </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--gray-900)' }}>{f.filename}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-600)' }}>
-                    Uploaded: {new Date(f.uploadedAt || '').toLocaleDateString()} • {f.size ? `${(f.size / 1024).toFixed(0)} KB` : ''}
+                <div style={{ overflow: "hidden", minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      color: "var(--gray-900)",
+                      textOverflow: "ellipsis",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={f.filename}
+                  >
+                    {f.filename}
+                  </div>
+                  <div style={{ fontSize: "10px", color: "var(--gray-500)" }}>
+                    {f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString() : ""} {f.size ? `• ${(f.size / 1024).toFixed(0)} KB` : ""}
                   </div>
                 </div>
               </div>
-              <div className="doc-actions" style={{ display: 'flex', gap: '8px' }}>
+              <div className="doc-actions" style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
                 <button
-                  onClick={async () => {
-                    try {
-                      toast.loading("Downloading...", { id: `download-${f.id}` })
-                      const res = await fetch(`/api/files/${f.id}/download`)
-
-                      if (!res.ok) {
-                        const errorText = await res.text()
-                        throw new Error(errorText || "Download failed")
-                      }
-
-                      const contentType = res.headers.get("content-type")
-                      if (contentType && contentType.includes("application/json")) {
-                        const errorData = await res.json()
-                        throw new Error(errorData.error || "Download failed")
-                      }
-
-                      const blob = await res.blob()
-                      const url = window.URL.createObjectURL(blob)
-
-                      const a = document.createElement("a")
-                      a.href = url
-                      a.download = f.filename
-                      a.style.display = "none"
-                      document.body.appendChild(a)
-                      a.click()
-
-                      setTimeout(() => {
-                        window.URL.revokeObjectURL(url)
-                        document.body.removeChild(a)
-                      }, 100)
-
-                      toast.success("Downloaded!", { id: `download-${f.id}` })
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : "Download failed", { id: `download-${f.id}` })
-                    }
-                  }}
+                  type="button"
+                  onClick={() => handleDownloadFile(f)}
                   className="btn btn-secondary"
-                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                  style={{ padding: "4px 8px", fontSize: "11px", display: "flex", alignItems: "center" }}
                   title="Download file"
                 >
                   <DownloadIcon />
                 </button>
                 {showDelete && (
                   <button
-                    onClick={async () => {
-                      if (!confirm("Are you sure you want to delete this file?")) return
-                      setDeleting(f.id)
-                      try {
-                        const res = await fetch(`/api/files/${f.id}`, { method: "DELETE" })
-                        if (!res.ok) {
-                          const data = await res.json().catch(() => ({}))
-                          throw new Error(data.error || "Delete failed")
-                        }
-                        toast.success("File deleted")
-                        window.location.reload()
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Failed to delete file")
-                      } finally {
-                        setDeleting(null)
-                      }
-                    }}
+                    type="button"
+                    onClick={() => handleDeleteFile(f.id)}
                     disabled={deleting === f.id}
                     className="btn btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--color-error)' }}
+                    style={{ padding: "4px 8px", fontSize: "11px", color: "var(--color-error)" }}
                     title="Delete"
                   >
                     {deleting === f.id ? <LoaderIcon /> : <TrashIcon />}
@@ -292,7 +333,7 @@ export function FileUploadButton({ projectId, fileType, label, existingFiles, is
           ))}
         </div>
       ) : (
-        <p style={{ color: 'var(--gray-500)', fontSize: '13px' }}>
+        <p style={{ color: "var(--gray-500)", fontSize: "12px", margin: 0 }}>
           No documents uploaded
         </p>
       )}

@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Download, CheckCircle, XCircle, Eye, FileText, Search, RefreshCw } from "lucide-react"
+import { Loader2, Download, CheckCircle, XCircle, Eye, FileText, Search, RefreshCw, FileSpreadsheet } from "lucide-react"
 import { formatDate, formatCurrency } from "@/utils/formatters"
 import { FileUploadButton } from "@/components/projects/file-upload-button"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { exportToExcel } from "@/utils/excel-export"
 
 interface Collateral {
   id: string
@@ -117,6 +118,62 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
 
   const filteredPi = filterProjects(pendingPi)
   const filteredPo = filterProjects(pendingPo)
+
+  // Export to Excel handler (respects applied search / POC filters)
+  const handleExportExcel = async () => {
+    const currentList = filteredPo
+    if (currentList.length === 0) {
+      toast.error("No pending PO records to export")
+      return
+    }
+
+    const columns = [
+      { header: "Project ID", key: "projectId", width: 18 },
+      { header: "Project Name", key: "projectName", width: 26 },
+      { header: "Assigned POC", key: "pocName", width: 22 },
+      { header: "Client", key: "clientName", width: 22 },
+      { header: "Location", key: "location", width: 18 },
+      { header: "Branch", key: "branch", width: 18 },
+      { header: "Delivery Date", key: "deliveryDate", width: 16 },
+      { header: "PI Number", key: "piNumber", width: 18 },
+      { header: "Base Cost (₹)", key: "baseCost", width: 16 },
+      { header: "GST Amount (₹)", key: "gstAmount", width: 16 },
+      { header: "Grand Total (₹)", key: "grandTotal", width: 18 },
+      { header: "PO File Status", key: "poStatus", width: 24 },
+    ]
+
+    const data = currentList.map((p) => {
+      const collateralGst = p.collaterals.reduce(
+        (s, c) => s + c.totalPrice * ((c.gstRate ?? 18) / 100),
+        0
+      )
+      const grandTotal = p.grandTotal > 0 ? p.grandTotal : p.totalCost + collateralGst
+      const poFiles = p.files.filter((f) => f.type === "PO")
+
+      return {
+        projectId: p.projectId,
+        projectName: p.name,
+        pocName: p.poc?.name || p.pocName || "Not Assigned",
+        clientName: p.client?.name || p.clientName || "Not Assigned",
+        location: p.location || "—",
+        branch: p.branch || "—",
+        deliveryDate: p.deliveryDate ? formatDate(p.deliveryDate) : "—",
+        piNumber: p.piNumber || "—",
+        baseCost: p.totalCost,
+        gstAmount: grandTotal - p.totalCost,
+        grandTotal: grandTotal,
+        poStatus: poFiles.length > 0 ? `Uploaded (${poFiles[0].filename})` : "Pending PO",
+      }
+    })
+
+    await exportToExcel({
+      filename: searchQuery.trim() ? `Pending_PO_Report_${searchQuery.trim().replace(/\s+/g, "_")}` : "Pending_PO_Report",
+      sheetName: "Pending PO",
+      columns,
+      data,
+    })
+    toast.success(`Exported ${currentList.length} filtered Pending PO records to Excel!`)
+  }
 
   // Send individual reminder
   const handleSendIndividualReminder = async (projectId: string) => {
@@ -486,32 +543,58 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
             )}
           </div>
 
-          {/* Search Box */}
+          {/* Search Box & Export to Excel */}
           {activeTab !== "settings" && (
-            <div style={{ position: "relative", width: "260px" }}>
-              <Search
-                size={16}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ position: "relative", width: "240px" }}>
+                <Search
+                  size={16}
+                  style={{
+                    position: "absolute",
+                    left: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--gray-400)",
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search ID, project, POC..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="form-input"
+                  style={{
+                    paddingLeft: "36px",
+                    marginBottom: 0,
+                    fontSize: "13px",
+                    height: "36px",
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="btn btn-primary"
                 style={{
-                  position: "absolute",
-                  left: "12px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--gray-400)",
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Search ID, project, POC..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="form-input"
-                style={{
-                  paddingLeft: "36px",
-                  marginBottom: 0,
-                  fontSize: "13px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "0 14px",
                   height: "36px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  backgroundColor: "var(--axis-primary, #003c71)",
+                  color: "white",
+                  border: "none",
+                  boxShadow: "0 2px 6px rgba(0, 60, 113, 0.25)",
                 }}
-              />
+              >
+                <FileSpreadsheet size={15} />
+                Export to Excel
+              </button>
             </div>
           )}
         </div>
@@ -686,7 +769,7 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
                   <th>Delivery Date</th>
                   <th>PI Number</th>
                   <th>Total Amount</th>
-                  <th style={{ width: "280px" }}>Actions / PO Upload</th>
+                  <th style={{ width: "320px", minWidth: "280px" }}>Actions / PO Upload</th>
                 </tr>
               </thead>
               <tbody>
@@ -735,7 +818,7 @@ export function PendingPiPoClient({ initialPendingPi, initialPendingPo, userRole
                           </span>
                         </div>
                       </td>
-                      <td onClick={(e) => e.stopPropagation()} style={{ cursor: "default" }}>
+                      <td onClick={(e) => e.stopPropagation()} style={{ cursor: "default", minWidth: "280px" }}>
                         {/* Inline upload component for PO */}
                         <div style={{ padding: "4px 0" }}>
                           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
