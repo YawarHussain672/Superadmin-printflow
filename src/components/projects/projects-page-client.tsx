@@ -224,60 +224,84 @@ export function ProjectsPageClient() {
   }
 
   const handleExportExcel = async () => {
-    if (projects.length === 0) {
-      toast.error("No projects found to export")
-      return
-    }
+    try {
+      toast.info("Preparing complete Excel export...")
 
-    const columns = [
-      { header: "Project ID", key: "projectId", width: 18 },
-      { header: "Project Name", key: "projectName", width: 26 },
-      { header: "Status", key: "status", width: 16 },
-      { header: "Assigned POC", key: "pocName", width: 22 },
-      { header: "Client", key: "clientName", width: 22 },
-      { header: "Location", key: "location", width: 18 },
-      { header: "Branch", key: "branch", width: 18 },
-      { header: "Materials / Items", key: "materials", width: 32 },
-      { header: "Delivery Date", key: "deliveryDate", width: 16 },
-      { header: "Base Cost (₹)", key: "totalCost", width: 16 },
-      { header: "Grand Total (₹)", key: "grandTotal", width: 18 },
-    ]
+      const queryParams = new URLSearchParams()
+      if (params.status) queryParams.set("status", params.status)
+      if (params.poc) queryParams.set("poc", params.poc)
+      if (params.location) queryParams.set("location", params.location)
+      if (params.search) queryParams.set("search", params.search)
+      queryParams.set("page", "1")
+      queryParams.set("limit", "10000")
 
-    const data = projects.map((p) => {
-      const materialsStr = p.collaterals && p.collaterals.length > 0
-        ? p.collaterals.map((c) => `${c.itemName} (Qty: ${c.quantity})`).join(", ")
-        : "—"
-
-      return {
-        projectId: p.projectId,
-        projectName: p.name,
-        status: p.status,
-        pocName: p.poc?.name || p.pocName || "Not Assigned",
-        clientName: p.client?.name || p.clientName || "Not Assigned",
-        location: p.location || "—",
-        branch: p.branch || "—",
-        materials: materialsStr,
-        deliveryDate: p.deliveryDate ? formatDate(p.deliveryDate) : "—",
-        totalCost: p.totalCost,
-        grandTotal: p.grandTotal || p.totalCost * 1.18,
+      const res = await fetch(`/api/projects?${queryParams}`)
+      if (!res.ok) {
+        toast.error("Failed to fetch full project data for export")
+        return
       }
-    })
 
-    let filterLabel = ""
-    if (params.poc) {
-      const pObj = pocs.find((poc) => poc.id === params.poc)
-      if (pObj) filterLabel += `_${pObj.name.replace(/\s+/g, "_")}`
+      const resData = await res.json()
+      const exportProjects: Project[] = resData.projects || []
+
+      if (exportProjects.length === 0) {
+        toast.error("No matching projects found to export")
+        return
+      }
+
+      const columns = [
+        { header: "Project ID", key: "projectId", width: 18 },
+        { header: "Project Name", key: "projectName", width: 26 },
+        { header: "Status", key: "status", width: 16 },
+        { header: "Assigned POC", key: "pocName", width: 22 },
+        { header: "Client", key: "clientName", width: 22 },
+        { header: "Location", key: "location", width: 18 },
+        { header: "Branch", key: "branch", width: 18 },
+        { header: "Materials / Items", key: "materials", width: 32 },
+        { header: "Delivery Date", key: "deliveryDate", width: 16 },
+        { header: "Base Cost (₹)", key: "totalCost", width: 16 },
+        { header: "Grand Total (₹)", key: "grandTotal", width: 18 },
+      ]
+
+      const rows = exportProjects.map((p) => {
+        const materialsStr = p.collaterals && p.collaterals.length > 0
+          ? p.collaterals.map((c) => `${c.itemName} (Qty: ${c.quantity})`).join(", ")
+          : "—"
+
+        return {
+          projectId: p.projectId,
+          projectName: p.name,
+          status: p.status,
+          pocName: p.poc?.name || p.pocName || "Not Assigned",
+          clientName: p.client?.name || p.clientName || "Not Assigned",
+          location: p.location || "—",
+          branch: p.branch || "—",
+          materials: materialsStr,
+          deliveryDate: p.deliveryDate ? formatDate(p.deliveryDate) : "—",
+          totalCost: p.totalCost,
+          grandTotal: p.grandTotal || p.totalCost * 1.18,
+        }
+      })
+
+      let filterLabel = ""
+      if (params.poc) {
+        const pObj = pocs.find((poc) => poc.id === params.poc)
+        if (pObj) filterLabel += `_${pObj.name.replace(/\s+/g, "_")}`
+      }
+      if (params.status) filterLabel += `_${params.status}`
+      if (params.location) filterLabel += `_${params.location}`
+
+      await exportToExcel({
+        filename: `Projects_Report${filterLabel}`,
+        sheetName: "Projects",
+        columns,
+        data: rows,
+      })
+      toast.success(`Exported all ${exportProjects.length} matching project records to Excel!`)
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to generate Excel report")
     }
-    if (params.status) filterLabel += `_${params.status}`
-    if (params.location) filterLabel += `_${params.location}`
-
-    await exportToExcel({
-      filename: `Projects_Report${filterLabel}`,
-      sheetName: "Projects",
-      columns,
-      data,
-    })
-    toast.success(`Exported ${projects.length} filtered project records to Excel!`)
   }
 
   const [searchInput, setSearchInput] = useState(params.search)
@@ -382,7 +406,7 @@ export function ProjectsPageClient() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                marginLeft: isClient ? 'auto' : undefined,
+                marginLeft: 'auto',
                 height: '42px',
                 padding: '0 16px',
                 fontWeight: 600,
@@ -397,14 +421,6 @@ export function ProjectsPageClient() {
               }}
             >
               Export to Excel
-            </button>
-          )}
-
-          {/* New Project Button */}
-          {!isClient && (
-            <button className="btn btn-primary" onClick={openNewProjectModal} style={{ marginLeft: 'auto' }}>
-              <PlusIcon />
-              New Project
             </button>
           )}
         </div>

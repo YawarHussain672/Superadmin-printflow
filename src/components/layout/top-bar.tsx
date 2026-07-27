@@ -7,6 +7,7 @@ import { useDebouncedCallback } from "use-debounce"
 import { useSession } from "next-auth/react"
 import { openNewProjectModal } from "@/components/projects/new-project-modal"
 import { NotificationBell } from "./notification-bell"
+import { formatCurrency, formatDate } from "@/utils/formatters"
 
 interface TopBarProps {
   user?: { role: string; companyName?: string }
@@ -115,6 +116,7 @@ export function TopBar({ user, onToggleSidebar }: TopBarProps) {
       const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
       const pageW = doc.internal.pageSize.getWidth()
 
+      // Header Banner
       doc.setFillColor(0, 60, 113)
       doc.rect(0, 0, pageW, 24, "F")
       doc.setTextColor(255, 255, 255)
@@ -131,54 +133,85 @@ export function TopBar({ user, onToggleSidebar }: TopBarProps) {
       // Center: Report title
       doc.setFontSize(14)
       doc.setFont("helvetica", "bold")
-      doc.text("Projects Report", pageW / 2, 13, { align: "center" })
+      doc.text("Projects Master Report", pageW / 2, 13, { align: "center" })
 
-      // Right: Date
+      // Right: Date & Record Count
       doc.setFontSize(8)
       doc.setFont("helvetica", "normal")
       doc.text(`Generated: ${date}`, pageW - 14, 11, { align: "right" })
+      doc.text(`Total Records: ${data.length}`, pageW - 14, 16, { align: "right" })
 
       autoTable(doc, {
-        head: [["Project ID", "Name", "POC", "Location", "Status", "Delivery Date", "Cost"]],
+        head: [["Project ID", "Project Name", "Assigned To", "Location", "Status", "Delivery Date", "Grand Total (incl. GST)"]],
         body: data.map((p: { 
-          projectId: string; 
-          name: string; 
-          poc?: { name: string }; 
-          pocName?: string | null;
-          client?: { name: string };
-          clientName?: string | null;
-          location: string; 
-          status: string; 
-          deliveryDate: string; 
-          totalCost: number 
+          projectId: string 
+          name: string 
+          poc?: { name: string } 
+          pocName?: string | null
+          client?: { name: string }
+          clientName?: string | null
+          location: string 
+          status: string 
+          deliveryDate: string 
+          totalCost: number
+          grandTotal?: number
         }) => {
           const pocName = p.poc?.name || p.pocName
           const clientName = p.client?.name || p.clientName
+          const assignedStr = pocName 
+            ? `${pocName} (POC)${clientName ? `\non behalf of\n${clientName} (CLIENT)` : ''}`
+            : (clientName ? `${clientName} (CLIENT)` : "Not Assigned")
+
+          const grandTotalVal = p.grandTotal || (p.totalCost ? p.totalCost * 1.18 : 0)
+          const formattedTotal = `Rs. ${grandTotalVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          const delDate = p.deliveryDate ? formatDate(p.deliveryDate) : "—"
+
           return [
             p.projectId,
-            p.name.slice(0, 30),
-            pocName 
-              ? `${pocName} (POC)${clientName ? `\non behalf of\n${clientName} (CLIENT)` : ''}`
-              : (clientName ? `${clientName} (CLIENT)` : "—"),
-            p.location,
+            p.name,
+            assignedStr,
+            p.location || "—",
             p.status,
-            new Date(p.deliveryDate).toLocaleDateString("en-IN"),
-            `Rs. ${p.totalCost.toLocaleString("en-US")}`,
+            delDate,
+            formattedTotal,
           ]
         }),
         startY: 28,
-        styles: { fontSize: 8, cellPadding: 3, valign: "middle" },
-        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+        styles: { fontSize: 8, cellPadding: 3, valign: "middle", font: "helvetica", textColor: [30, 41, 59] },
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
-          2: { cellWidth: 50 }, // Give POC column more width for multiline
+          0: { cellWidth: 26, fontStyle: "bold", textColor: [0, 60, 113] },
+          1: { cellWidth: 55 },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 26 },
+          4: { cellWidth: 26 },
+          5: { cellWidth: 26 },
+          6: { cellWidth: 36, fontStyle: "bold", textColor: [4, 120, 87] },
         },
         margin: { left: 14, right: 14 },
       })
 
+      // Footer with page numbering
+      const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        const pageH = doc.internal.pageSize.getHeight()
+        doc.setFillColor(248, 250, 252)
+        doc.rect(0, pageH - 10, pageW, 10, "F")
+        doc.setFontSize(7)
+        doc.setTextColor(148, 163, 184)
+        doc.setFont("helvetica", "normal")
+        doc.text("Axis Max Life Insurance — Confidential", 14, pageH - 4)
+        doc.text(`Page ${i} of ${pageCount}`, pageW / 2, pageH - 4, { align: "center" })
+        doc.text("axis-print-management.internal", pageW - 14, pageH - 4, { align: "right" })
+      }
+
       doc.save(`Projects_Report_${new Date().toISOString().split("T")[0]}.pdf`)
-      toast.success("Report downloaded!")
-    } catch {
-      toast.error("Export failed")
+      toast.success("PDF report downloaded!")
+    } catch (err) {
+      console.error(err)
+      toast.error("Export failed. Please try again.")
     } finally {
       setExporting(false)
     }

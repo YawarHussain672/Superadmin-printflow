@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { formatCurrency } from "@/utils/formatters"
-import { jsPDF } from "jspdf"
-import autoTable from "jspdf-autotable"
+import { FileSpreadsheet } from "lucide-react"
+import { exportToExcel } from "@/utils/excel-export"
+import { toast } from "sonner"
 
 interface StatusSummary {
   status: string
@@ -83,66 +84,74 @@ export default function AnalyticsPage() {
     return null
   }
 
-  const exportReport = () => {
-    if (!data) return
-    const doc = new jsPDF()
-    const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-    const pageW = doc.internal.pageSize.getWidth()
+  const exportReport = async () => {
+    if (!data) {
+      toast.error("No analytics data available to export")
+      return
+    }
 
-    // Header
-    doc.setFillColor(0, 60, 113)
-    doc.rect(0, 0, pageW, 24, "F")
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(13)
-    doc.setFont("helvetica", "bold")
-    doc.text("AXIS MAX LIFE", 14, 11)
-    doc.setFontSize(8)
-    doc.setFont("helvetica", "normal")
-    doc.text("Marketing ROI Dashboard", 14, 16)
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("Analytics Report", pageW / 2, 13, { align: "center" })
-    doc.setFontSize(8)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Generated: ${date}`, pageW - 14, 11, { align: "right" })
-
-    // Marketing ROI Summary Table
-    const summaryData = [
-      ["Marketing Spend", `Rs. ${data.totalSpend.toLocaleString("en-US")}`],
-      ["Leads Generated", data.totalLeadsGenerated.toLocaleString("en-US")],
-      ["Conversions", data.totalLeadsConverted.toLocaleString("en-US")],
-      ["Conversion Rate", `${data.conversionRate.toFixed(1)}%`],
-      ["Cost Per Lead (CPL)", `Rs. ${data.avgCPL.toLocaleString("en-US")}`],
-      ["Cost Per Acquisition (CPA)", `Rs. ${data.avgCPA.toLocaleString("en-US")}`],
-      ["Total Projects", data.totalProjects.toString()],
-      ["Delivered Projects", data.deliveredProjects.toString()],
-      ["Delivery Rate", `${data.deliveryRate.toFixed(1)}%`],
+    const columns = [
+      { header: "Metric / Category", key: "metric", width: 32 },
+      { header: "Value", key: "value", width: 26 },
     ]
 
-    autoTable(doc, {
-      head: [["Metric", "Value"]],
-      body: summaryData,
-      startY: 30,
-      styles: { fontSize: 10, cellPadding: 4 },
-      headStyles: { fillColor: [0, 60, 113], textColor: 255 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: {
-        0: { fontStyle: "bold" },
-        1: { halign: "right" },
-      },
-    })
+    const rows = [
+      { metric: "Marketing Spend (₹)", value: `₹${data.totalSpend.toLocaleString("en-IN")}` },
+      { metric: "Total Leads Generated", value: data.totalLeadsGenerated.toLocaleString("en-IN") },
+      { metric: "Total Leads Converted", value: data.totalLeadsConverted.toLocaleString("en-IN") },
+      { metric: "Conversion Rate (%)", value: `${data.conversionRate.toFixed(1)}%` },
+      { metric: "Cost Per Lead - CPL (₹)", value: `₹${data.avgCPL.toLocaleString("en-IN")}` },
+      { metric: "Cost Per Acquisition - CPA (₹)", value: `₹${data.avgCPA.toLocaleString("en-IN")}` },
+      { metric: "Total Projects", value: data.totalProjects.toString() },
+      { metric: "Delivered Projects", value: data.deliveredProjects.toString() },
+      { metric: "Delivery Rate (%)", value: `${data.deliveryRate.toFixed(1)}%` },
+    ]
 
-    doc.save(`analytics-report-${new Date().toISOString().split("T")[0]}.pdf`)
+    await exportToExcel({
+      filename: `Marketing_ROI_Analytics_Report_${new Date().toISOString().split("T")[0]}`,
+      sheetName: "Marketing ROI Summary",
+      columns,
+      data: rows,
+    })
+    toast.success("Marketing ROI report exported to Excel successfully!")
   }
 
-  const exportBranchData = () => {
-    if (!data?.branchData) return
-    const doc = new jsPDF()
-    doc.setFontSize(18)
-    doc.setTextColor(0, 60, 113)
-    doc.text("Branch-Level Performance", 14, 20)
+  const exportBranchData = async () => {
+    const list = data?.branchData || []
+    if (list.length === 0) {
+      toast.error("No branch data available to export")
+      return
+    }
 
-    const tableData = data.branchData.map((b) => {
+    let targetBranches = list
+    if (branchFilter === "top") {
+      targetBranches = list.filter((b) => {
+        const leads = Number(b.leads_generated) || 0
+        const conversions = Number(b.conversions) || 0
+        const rate = leads > 0 ? (conversions / leads) * 100 : 0
+        return rate >= 10
+      })
+    } else if (branchFilter === "attention") {
+      targetBranches = list.filter((b) => {
+        const leads = Number(b.leads_generated) || 0
+        const conversions = Number(b.conversions) || 0
+        const rate = leads > 0 ? (conversions / leads) * 100 : 0
+        return rate < 10
+      })
+    }
+
+    const columns = [
+      { header: "Branch Location", key: "branch", width: 25 },
+      { header: "Campaigns", key: "campaigns", width: 14 },
+      { header: "Leads Generated", key: "leads", width: 18 },
+      { header: "Conversions", key: "conversions", width: 16 },
+      { header: "Conversion Rate", key: "conversionRate", width: 18 },
+      { header: "Marketing Spend (₹)", key: "marketingSpend", width: 22 },
+      { header: "CPL (₹)", key: "cpl", width: 16 },
+      { header: "CPA (₹)", key: "cpa", width: 16 },
+    ]
+
+    const rows = targetBranches.map((b) => {
       const leads = Number(b.leads_generated) || 0
       const conversions = Number(b.conversions) || 0
       const spend = b.marketing_spend || 0
@@ -150,28 +159,25 @@ export default function AnalyticsPage() {
       const cpa = conversions > 0 ? Math.round(spend / conversions) : 0
       const conversionRate = leads > 0 ? ((conversions / leads) * 100).toFixed(1) + "%" : "0.0%"
 
-      return [
-        b.branch,
-        b.campaigns.toString(),
-        leads.toLocaleString("en-US"),
-        conversions.toLocaleString("en-US"),
+      return {
+        branch: b.branch,
+        campaigns: b.campaigns,
+        leads: leads.toLocaleString("en-IN"),
+        conversions: conversions.toLocaleString("en-IN"),
         conversionRate,
-        "Rs. " + spend.toLocaleString("en-US"),
-        cpl > 0 ? "Rs. " + cpl.toLocaleString("en-US") : "Rs. 0",
-        cpa > 0 ? "Rs. " + cpa.toLocaleString("en-US") : "N/A"
-      ]
+        marketingSpend: `₹${spend.toLocaleString("en-IN")}`,
+        cpl: cpl > 0 ? `₹${cpl.toLocaleString("en-IN")}` : "₹0",
+        cpa: cpa > 0 ? `₹${cpa.toLocaleString("en-IN")}` : "N/A",
+      }
     })
 
-    autoTable(doc, {
-      head: [["Branch Location", "Campaigns", "Leads Generated", "Conversions", "Conversion Rate", "Marketing Spend", "CPL", "CPA"]],
-      body: tableData,
-      startY: 30,
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [0, 60, 113], textColor: 255 },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
+    await exportToExcel({
+      filename: `Branch_Performance_Report_${branchFilter}_${new Date().toISOString().split("T")[0]}`,
+      sheetName: "Branch Performance",
+      columns,
+      data: rows,
     })
-
-    doc.save(`branch-performance-${new Date().toISOString().split("T")[0]}.pdf`)
+    toast.success(`Exported ${rows.length} branch performance records to Excel!`)
   }
 
   const getStatusBadgeClass = (status: string) => {
@@ -206,7 +212,30 @@ export default function AnalyticsPage() {
       <div className="card" style={{ marginBottom: "32px", padding: "24px" }}>
         <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
           <div className="card-title" style={{ fontSize: "20px", fontWeight: 700, color: "#1f2937" }}>Marketing ROI Dashboard</div>
-          <button className="btn btn-primary" onClick={exportReport}>Export Report</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={exportReport}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '42px',
+              padding: '0 16px',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              backgroundColor: 'var(--axis-primary, #003c71)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              boxShadow: '0 2px 6px rgba(0, 60, 113, 0.25)',
+            }}
+          >
+            <FileSpreadsheet size={16} />
+            Export Report
+          </button>
         </div>
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "16px" }}>
@@ -464,7 +493,30 @@ export default function AnalyticsPage() {
               <option value="top">Top Performer</option>
               <option value="attention">Need Attention</option>
             </select>
-            <button className="btn btn-secondary" onClick={exportBranchData}>Export Data</button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={exportBranchData}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '42px',
+                padding: '0 16px',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                backgroundColor: 'var(--axis-primary, #003c71)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0 2px 6px rgba(0, 60, 113, 0.25)',
+              }}
+            >
+              <FileSpreadsheet size={16} />
+              Export Data
+            </button>
           </div>
         </div>
         <div className="card-body" style={{ padding: 0 }}>

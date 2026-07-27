@@ -11,9 +11,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") || "projects"
-    // POC and CLIENT only see their own projects
-    const projectFilter = (session.user.role === "POC" || session.user.role === "CLIENT")
-      ? { pocId: session.user.id }
+    // Role-based project filtering
+    const projectFilter = session.user.role === "CLIENT"
+      ? { clientId: session.user.id }
+      : session.user.role === "POC"
+      ? {
+          OR: [
+            { pocId: session.user.id },
+            { AND: [{ clientId: { not: null } }, { approval: { requestedById: session.user.id } }] }
+          ]
+        }
       : {}
 
     if (type === "projects") {
