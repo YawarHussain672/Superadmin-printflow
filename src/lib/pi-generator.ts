@@ -185,12 +185,34 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   doc.text("Job Name :-", labelX, detailsY + 24)
   doc.setFont("times", "bold")
-  doc.text(project.name, valueX, detailsY + 24)
-  // Underline for Job Name
-  const jobNameWidth = doc.getTextWidth(project.name)
-  doc.setLineWidth(0.1)
-  doc.line(valueX, detailsY + 25, valueX + jobNameWidth, detailsY + 25)
+  const maxJobNameWidth = (10 + colWidth * 2) - valueX - 2
+  
+  let jobNameFontSize = 9
+  doc.setFontSize(jobNameFontSize)
+  let jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
+  
+  if (jobNameLines.length > 1) {
+    jobNameFontSize = 7.5
+    doc.setFontSize(jobNameFontSize)
+    jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
+  }
+  if (jobNameLines.length > 2) {
+    jobNameFontSize = 6.5
+    doc.setFontSize(jobNameFontSize)
+    jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
+  }
 
+  const jobLineStep = jobNameLines.length > 1 ? (jobNameFontSize * 0.35) : 0
+  jobNameLines.forEach((line: string, index: number) => {
+    const lineY = detailsY + 24 + (index * jobLineStep)
+    doc.text(line, valueX, lineY)
+    const lineWidth = doc.getTextWidth(line)
+    doc.setLineWidth(0.1)
+    doc.line(valueX, lineY + 0.8, valueX + lineWidth, lineY + 0.8)
+  })
+
+  // Restore font size & style for contact person at exact original Y position
+  doc.setFontSize(9)
   doc.setFont("times", "normal")
   doc.text("Contact Person:-", labelX, detailsY + 29)
   doc.text(project.pocName || "", valueX, detailsY + 29)
