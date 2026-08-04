@@ -202,20 +202,24 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
     jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
   }
 
+  let lastJobLineY = detailsY + 24
   const jobLineStep = jobNameLines.length > 1 ? (jobNameFontSize * 0.35) : 0
   jobNameLines.forEach((line: string, index: number) => {
     const lineY = detailsY + 24 + (index * jobLineStep)
+    lastJobLineY = lineY
     doc.text(line, valueX, lineY)
     const lineWidth = doc.getTextWidth(line)
     doc.setLineWidth(0.1)
     doc.line(valueX, lineY + 0.8, valueX + lineWidth, lineY + 0.8)
   })
 
-  // Restore font size & style for contact person at exact original Y position
+  const contactY = jobNameLines.length > 1 ? Math.max(detailsY + 29, lastJobLineY + 4.2) : detailsY + 29
+
+  // Restore font size & style for contact person at dynamic Y position
   doc.setFontSize(9)
   doc.setFont("times", "normal")
-  doc.text("Contact Person:-", labelX, detailsY + 29)
-  doc.text(project.pocName || "", valueX, detailsY + 29)
+  doc.text("Contact Person:-", labelX, contactY)
+  doc.text(project.pocName || "", valueX, contactY)
 
   // Draw Boxes for Details
   doc.setLineWidth(0.1)
