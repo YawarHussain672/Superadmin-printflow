@@ -37,7 +37,7 @@ async function deleteS3Asset(url: string | null | undefined) {
 
 async function priceCollaterals(
   projectId: string | undefined,
-  collaterals: Array<{ itemName: string; quantity: number; unitPrice?: number; specification?: string | null }>,
+  collaterals: Array<{ itemName: string; quantity: number; unitPrice?: number; gstRate?: number; specification?: string | null }>,
   isAdmin: boolean = false
 ) {
   const priced = await Promise.all(collaterals.map(async (c) => {
@@ -47,7 +47,7 @@ async function priceCollaterals(
     })
     const calc = await calculateTotal(c.itemName, c.quantity)
     let unitPrice: number
-    let gstRate: number = rateCard?.gstRate ?? calc?.gstRate ?? 18
+    let gstRate: number = c.gstRate ?? rateCard?.gstRate ?? calc?.gstRate ?? 18
     let totalPrice: number
     let gstAmount: number
 
@@ -57,9 +57,9 @@ async function priceCollaterals(
       gstAmount = totalPrice * (gstRate / 100)
     } else if (calc !== null) {
       unitPrice = calc.unitPrice
-      gstRate = calc.gstRate
+      gstRate = c.gstRate ?? calc.gstRate
       totalPrice = calc.subtotal
-      gstAmount = calc.gst
+      gstAmount = totalPrice * (gstRate / 100)
     } else if (projectId) {
       // Fallback to existing collateral price on project update if rate card is missing
       const existingCollateral = await prisma.collateral.findFirst({
@@ -70,7 +70,7 @@ async function priceCollaterals(
       })
       if (existingCollateral) {
         unitPrice = existingCollateral.unitPrice
-        gstRate = existingCollateral.gstRate ?? 18
+        gstRate = c.gstRate ?? existingCollateral.gstRate ?? 18
         totalPrice = unitPrice * c.quantity
         gstAmount = totalPrice * (gstRate / 100)
       } else {

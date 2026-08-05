@@ -63,6 +63,7 @@ interface CollateralWithPrice {
   gstRate?: number
   gstAmount?: number
   specification?: string | null
+  isManualRate?: boolean
 }
 
 interface EditProjectDialogProps {
@@ -269,16 +270,20 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           ?.filter(c => c.itemName !== 'Packaging Charges' && c.itemName !== 'Packing Charges')
           ?.map(c => {
             const totalPrice = c.totalPrice || (c.unitPrice * c.quantity) || 0
-            const gstRate = c.gstRate ?? 18
+            const unitPrice = c.unitPrice || (c.quantity > 0 ? (totalPrice / c.quantity) : 0) || getUnitPriceFromRateCardWithData(c.itemName, c.quantity, fetchedRateCards)
+            const rateCard = fetchedRateCards.find(r => r.name === c.itemName)
+            const gstRate = c.gstRate ?? rateCard?.gstRate ?? 18
+            const gstAmount = c.gstAmount !== undefined && c.gstAmount !== null && c.gstAmount > 0 ? c.gstAmount : totalPrice * (gstRate / 100)
             return {
               id: c.id,
               itemName: c.itemName,
               quantity: c.quantity,
-              unitPrice: c.unitPrice || 0,
+              unitPrice,
               totalPrice,
               gstRate,
-              gstAmount: c.gstAmount || totalPrice * (gstRate / 100),
+              gstAmount,
               specification: c.specification || "",
+              isManualRate: unitPrice > 0 && Math.abs(unitPrice - getUnitPriceFromRateCardWithData(c.itemName, c.quantity, fetchedRateCards)) > 0.01,
             }
           }) || []
         setCollaterals(loadedCollaterals)
@@ -420,6 +425,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     const updated = [...collaterals]
     const item = updated[index]
     item.unitPrice = newUnitPrice
+    item.isManualRate = true
     item.totalPrice = newUnitPrice * item.quantity
     if (item.gstRate !== undefined) {
       item.gstAmount = item.totalPrice * (item.gstRate / 100)
@@ -433,8 +439,8 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     const updated = [...collaterals]
     const item = updated[index]
     item.quantity = newQuantity
-    // If unit price is not set, look up from rate card; otherwise preserve existing unit price (e.g. manual Admin override)
-    if (!item.unitPrice || item.unitPrice <= 0) {
+    // Recalculate unit price from volume slabs if rate was not manually overridden by admin
+    if (!item.isManualRate) {
       const newUnitPrice = getUnitPriceFromRateCard(item.itemName, newQuantity)
       if (newUnitPrice > 0) {
         item.unitPrice = newUnitPrice
@@ -514,28 +520,17 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     updateTotalCost(updated)
   }
 
-  // Calculate draft item from Add Item form if active
-  const draftItemQuantity = parseInt(newItemQuantity) || 0
-  const draftItemUnitPrice = typeof newItemUnitPrice === "number" ? newItemUnitPrice : (parseFloat(newItemUnitPrice) || 0)
-  const draftItemRateCard = (showAddItemForm && selectedRateCardItem) ? rateCardItems.find(r => r.id === selectedRateCardItem) : null
-  const draftItemTotal = (showAddItemForm && draftItemRateCard && draftItemQuantity > 0) ? (draftItemQuantity * draftItemUnitPrice) : 0
-  const draftItemGstRate = draftItemRateCard?.gstRate ?? 18
-  const draftItemGstAmount = draftItemTotal * (draftItemGstRate / 100)
-
-  const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0) + draftItemTotal
+  const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
   const itemGstAmount = collaterals.reduce(
     (sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))),
     0
-  ) + draftItemGstAmount
+  )
   const computedTotalCost = itemsSubtotal + packingCharges + deliveryCharges
   const packingGstAmount = packingCharges * ((packingChargesGstRate === "" ? 18 : packingChargesGstRate) / 100)
   const deliveryGstAmount = deliveryCharges * ((deliveryChargesGstRate === "" ? 18 : deliveryChargesGstRate) / 100)
   const totalGstAmount = itemGstAmount + packingGstAmount + deliveryGstAmount
   const grandTotalAmount = computedTotalCost + totalGstAmount
-  const allGstRates = [
-    ...collaterals.filter(c => c.itemName).map(c => c.gstRate ?? 18),
-    ...(draftItemTotal > 0 ? [draftItemGstRate] : [])
-  ]
+  const allGstRates = collaterals.filter(c => c.itemName).map(c => c.gstRate ?? 18)
   const uniqueItemGstRates = [...new Set(allGstRates.map(r => `${r}%`))]
 
   const validate = () => {
@@ -552,30 +547,22 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // If there is an unadded item in the Add Item form, show ONLY this toaster
+    if (showAddItemForm && selectedRateCardItem && parseInt(newItemQuantity) > 0) {
+      toast.error("Please click 'Add' to include the pending item...")
+      return
+    }
+
     if (!validate()) { toast.error("Please fix the errors before saving"); return }
     if (!project) return
 
-    // Include any pending item currently in the Add Item form
-    let effectiveCollaterals = [...collaterals]
-    if (showAddItemForm && selectedRateCardItem && parseInt(newItemQuantity) > 0) {
-      const rateCard = rateCardItems.find(r => r.id === selectedRateCardItem)
-      if (rateCard) {
-        const qty = parseInt(newItemQuantity)
-        const unitPrice = typeof newItemUnitPrice === "number" ? newItemUnitPrice : (parseFloat(newItemUnitPrice) || getUnitPriceFromRateCard(rateCard.name, qty))
-        const gstRate = rateCard.gstRate ?? 18
-        const totalPrice = unitPrice * qty
-        effectiveCollaterals.push({
-          id: Math.random().toString(36).substring(2, 9),
-          itemName: rateCard.name,
-          quantity: qty,
-          unitPrice,
-          totalPrice,
-          gstRate,
-          gstAmount: totalPrice * (gstRate / 100),
-          specification: newItemSpecification.trim() || "",
-        })
-      }
-    }
+    // Dismiss any pending/unadded item in the Add Item form
+    setSelectedRateCardItem("")
+    setNewItemQuantity("")
+    setNewItemSpecification("")
+    setNewItemUnitPrice("")
+    setShowAddItemForm(false)
 
     setIsLoading(true)
     try {
@@ -594,13 +581,14 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           recipientName: formData.recipientName || null,
           recipientContact: formData.recipientContact || null,
           recipientBranch: formData.recipientBranch || null,
-          // Send all collaterals
-          collaterals: effectiveCollaterals.map(c => ({
+          // Send ONLY explicitly added collaterals
+          collaterals: collaterals.map(c => ({
             id: c.id,
             itemName: c.itemName,
             quantity: c.quantity,
             unitPrice: c.unitPrice,
             totalPrice: c.totalPrice,
+            gstRate: c.gstRate,
             specification: c.specification || "",
           })),
           // Packing charges
@@ -622,11 +610,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
       if (res.ok) {
         const originalCollaterals = project.collaterals
           ?.filter(c => c.itemName !== 'Packaging Charges' && c.itemName !== 'Packing Charges')
-          .map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" })) || []
-        const updatedCollaterals = effectiveCollaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
+          .map(c => ({ itemName: c.itemName, quantity: c.quantity, unitPrice: c.unitPrice || 0, specification: c.specification || "" })) || []
+        const updatedCollaterals = collaterals.map((c: CollateralWithPrice) => ({ itemName: c.itemName, quantity: c.quantity, unitPrice: c.unitPrice || 0, specification: c.specification || "" }))
 
-        const sortCollateral = (a: { itemName: string; quantity: number }, b: { itemName: string; quantity: number }) =>
-          a.itemName.localeCompare(b.itemName) || a.quantity - b.quantity
+        const sortCollateral = (a: { itemName: string; quantity: number; unitPrice: number }, b: { itemName: string; quantity: number; unitPrice: number }) =>
+          a.itemName.localeCompare(b.itemName) || a.quantity - b.quantity || a.unitPrice - b.unitPrice
 
         originalCollaterals.sort(sortCollateral)
         updatedCollaterals.sort(sortCollateral)
@@ -635,6 +623,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           originalCollaterals.some((item, index) =>
             item.itemName !== updatedCollaterals[index]?.itemName ||
             item.quantity !== updatedCollaterals[index]?.quantity ||
+            item.unitPrice !== updatedCollaterals[index]?.unitPrice ||
             item.specification !== updatedCollaterals[index]?.specification
           )
 

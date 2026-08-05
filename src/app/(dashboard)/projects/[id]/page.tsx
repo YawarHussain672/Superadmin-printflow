@@ -98,7 +98,7 @@ interface Project {
   client?: { id: string; name: string; email: string; phone: string; role?: string } | null
   pocName?: string | null
   clientName?: string | null
-  collaterals: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; specification?: string | null }[]
+  collaterals: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
   statusHistory: { id: string; status: ProjectStatus; note: string | null; timestamp: string }[]
   files: ProjectFile[]
   dispatch: {
@@ -581,7 +581,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 <div className="item-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-200)' }}>
                   <span style={{ color: 'var(--gray-600)' }}>GST on Items:</span>
                   <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                    {formatCurrency(project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate ?? 18) / 100)), 0))}
+                    {formatCurrency(project.collaterals.reduce((sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))), 0))}
                   </span>
                 </div>
                 {/* GST on Packing (if any) */}
@@ -607,7 +607,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <span style={{ color: 'var(--gray-700)', fontWeight: 600 }}>Total GST:</span>
                   <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                     {formatCurrency(
-                      project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate ?? 18) / 100)), 0) +
+                      project.collaterals.reduce((sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))), 0) +
                       ((project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100)) +
                       ((project.deliveryCharges || 0) * ((project.deliveryChargesGstRate ?? 18) / 100))
                     )}
@@ -618,12 +618,16 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <strong style={{ color: 'var(--gray-900)', fontSize: '16px' }}>Total Amount (incl. GST):</strong>
                   <strong style={{ fontSize: '20px', color: 'var(--axis-primary)', fontFamily: 'var(--font-mono)' }}>
                     {formatCurrency(
-                      project.collaterals.reduce((sum, c) => sum + c.totalPrice, 0) +
-                      (project.packingCharges || 0) +
-                      (project.deliveryCharges || 0) +
-                      project.collaterals.reduce((sum, c) => sum + (c.totalPrice * ((c.gstRate ?? 18) / 100)), 0) +
-                      ((project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100)) +
-                      ((project.deliveryCharges || 0) * ((project.deliveryChargesGstRate ?? 18) / 100))
+                      (project.grandTotal && project.grandTotal > 0)
+                        ? project.grandTotal
+                        : (
+                            project.collaterals.reduce((sum, c) => sum + c.totalPrice, 0) +
+                            (project.packingCharges || 0) +
+                            (project.deliveryCharges || 0) +
+                            project.collaterals.reduce((sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))), 0) +
+                            ((project.packingCharges || 0) * ((project.packingChargesGstRate ?? 18) / 100)) +
+                            ((project.deliveryCharges || 0) * ((project.deliveryChargesGstRate ?? 18) / 100))
+                          )
                     )}
                   </strong>
                 </div>

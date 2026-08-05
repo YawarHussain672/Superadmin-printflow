@@ -11,6 +11,7 @@ interface CollateralItem {
   specification?: string | null
   hsnCode?: string | null
   gstRate?: number | null
+  gstAmount?: number | null
 }
 
 interface ProjectData {
@@ -375,7 +376,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   const subtotal = itemsSubtotal + packingSubtotal + deliverySubtotal
   const collateralsGst = project.collaterals.reduce((sum, c) => {
     const rate = c.gstRate ?? 18
-    return sum + (c.totalPrice * (rate / 100))
+    return sum + (c.gstAmount || (c.totalPrice * (rate / 100)))
   }, 0)
   const packingRate = project.packingChargesGstRate ?? 18
   const packingGst = packingSubtotal * (packingRate / 100)

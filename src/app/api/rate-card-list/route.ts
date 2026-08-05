@@ -11,7 +11,7 @@ export async function GET() {
 
     const rateCards = await prisma.rateCard.findMany({
       where: { active: true },
-      select: { id: true, itemName: true, volumeSlabs: true },
+      select: { id: true, itemName: true, volumeSlabs: true, gstRate: true },
       orderBy: { itemName: "asc" },
     })
 
@@ -21,6 +21,7 @@ export async function GET() {
         name: r.itemName,
         volumeSlabs: r.volumeSlabs,
         defaultPrice: getUnitPriceFromSlabs(r.volumeSlabs, 1) ?? 0,
+        gstRate: r.gstRate ?? 18,
       }))
     )
   } catch (error) {
