@@ -184,9 +184,10 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   doc.text("Revise Date", labelX, detailsY + 18.2)
 
-  // Calculate Job Name lines & dynamic font size (max 2 lines with 67mm width, aligned at valueX)
-  const jobNameMaxWidth = (10 + colWidth * 2) - valueX - 2
+  // Calculate Job Name lines & dynamic font size (max 2 lines with safe padding inside right box border)
+  const jobNameMaxWidth = (10 + colWidth * 2) - valueX - 4
   let jobNameFontSize = 9
+  doc.setFont("times", "bold")
   doc.setFontSize(jobNameFontSize)
   let jobNameLines = doc.splitTextToSize(project.name, jobNameMaxWidth)
   
