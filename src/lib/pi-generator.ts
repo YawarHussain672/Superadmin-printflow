@@ -204,7 +204,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   }
 
   const jobNameStartY = 21.7
-  const jobLineStep = jobNameFontSize >= 9 ? 3.8 : 3.2
+  const jobLineStep = jobNameFontSize >= 9 ? 3.3 : 2.8
 
   doc.setFont("times", "normal")
   doc.setFontSize(9)
@@ -224,7 +224,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   // Dynamic box height calculation based on job name and contact person lines
   let contactPersonY = detailsY + 27.5
   if (jobNameLines.length > 1) {
-    contactPersonY = detailsY + jobNameStartY + ((jobNameLines.length - 1) * jobLineStep) + 4.8
+    contactPersonY = detailsY + jobNameStartY + ((jobNameLines.length - 1) * jobLineStep) + 4.2
   }
 
   // Calculate box height dynamically so it never overflows
