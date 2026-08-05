@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { BRANCH_LOCATIONS, CITIES } from "@/lib/branch-locations"
@@ -94,6 +95,8 @@ const COURIERS = [
 
 export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAdmin = false }: EditProjectDialogProps) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const effectiveIsAdmin = isAdmin || session?.user?.role === "ADMIN" || session?.user?.role === "SUPERADMIN"
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
   const [pocs, setPocs] = useState<POC[]>([])
@@ -128,6 +131,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   const [selectedRateCardItem, setSelectedRateCardItem] = useState("")
   const [newItemQuantity, setNewItemQuantity] = useState("")
   const [newItemSpecification, setNewItemSpecification] = useState("")
+  const [newItemUnitPrice, setNewItemUnitPrice] = useState<number | "">("")
   const [totalCost, setTotalCost] = useState(0)
   const [packingCharges, setPackingCharges] = useState(0)
   const [packingChargesGstRate, setPackingChargesGstRate] = useState<number | "">(18)
@@ -443,6 +447,33 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     setCollaterals(updated)
     updateTotalCost(updated)
   }
+  // Auto-calculate unit price when selected rate card item or quantity changes in add item form
+  function handleRateCardItemChange(itemId: string, currentQtyStr: string) {
+    setSelectedRateCardItem(itemId)
+    if (itemId) {
+      const rateCard = rateCardItems.find(r => r.id === itemId)
+      if (rateCard) {
+        const qty = parseInt(currentQtyStr) || 1
+        const price = getUnitPriceFromRateCard(rateCard.name, qty)
+        setNewItemUnitPrice(price)
+      }
+    } else {
+      setNewItemUnitPrice("")
+    }
+  }
+
+  function handleNewItemQuantityChange(qtyStr: string) {
+    setNewItemQuantity(qtyStr)
+    if (selectedRateCardItem) {
+      const rateCard = rateCardItems.find(r => r.id === selectedRateCardItem)
+      if (rateCard) {
+        const qty = parseInt(qtyStr) || 1
+        const price = getUnitPriceFromRateCard(rateCard.name, qty)
+        setNewItemUnitPrice(price)
+      }
+    }
+  }
+
   // Add new collateral from rate card
   function addCollateral() {
     if (!selectedRateCardItem || !parseInt(newItemQuantity)) return
@@ -451,10 +482,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     const rateCard = rateCardItems.find(r => r.id === selectedRateCardItem)
     if (!rateCard) return
 
-    const unitPrice = getUnitPriceFromRateCard(rateCard.name, quantity)
+    const unitPrice = typeof newItemUnitPrice === "number" ? newItemUnitPrice : (parseFloat(newItemUnitPrice) || getUnitPriceFromRateCard(rateCard.name, quantity))
     const gstRate = rateCard.gstRate ?? 18
     const totalPrice = unitPrice * quantity
     const newCollateral: CollateralWithPrice = {
+      id: Math.random().toString(36).substring(2, 9),
       itemName: rateCard.name,
       quantity: quantity,
       unitPrice: unitPrice,
@@ -471,6 +503,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     setSelectedRateCardItem("")
     setNewItemQuantity("")
     setNewItemSpecification("")
+    setNewItemUnitPrice("")
     setShowAddItemForm(false)
   }
 
@@ -481,16 +514,29 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     updateTotalCost(updated)
   }
 
-  const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0)
+  // Calculate draft item from Add Item form if active
+  const draftItemQuantity = parseInt(newItemQuantity) || 0
+  const draftItemUnitPrice = typeof newItemUnitPrice === "number" ? newItemUnitPrice : (parseFloat(newItemUnitPrice) || 0)
+  const draftItemRateCard = (showAddItemForm && selectedRateCardItem) ? rateCardItems.find(r => r.id === selectedRateCardItem) : null
+  const draftItemTotal = (showAddItemForm && draftItemRateCard && draftItemQuantity > 0) ? (draftItemQuantity * draftItemUnitPrice) : 0
+  const draftItemGstRate = draftItemRateCard?.gstRate ?? 18
+  const draftItemGstAmount = draftItemTotal * (draftItemGstRate / 100)
+
+  const itemsSubtotal = collaterals.reduce((sum, c) => sum + c.totalPrice, 0) + draftItemTotal
   const itemGstAmount = collaterals.reduce(
     (sum, c) => sum + (c.gstAmount || (c.totalPrice * ((c.gstRate ?? 18) / 100))),
     0
-  )
+  ) + draftItemGstAmount
+  const computedTotalCost = itemsSubtotal + packingCharges + deliveryCharges
   const packingGstAmount = packingCharges * ((packingChargesGstRate === "" ? 18 : packingChargesGstRate) / 100)
   const deliveryGstAmount = deliveryCharges * ((deliveryChargesGstRate === "" ? 18 : deliveryChargesGstRate) / 100)
   const totalGstAmount = itemGstAmount + packingGstAmount + deliveryGstAmount
-  const grandTotalAmount = totalCost + totalGstAmount
-  const uniqueItemGstRates = [...new Set(collaterals.filter(c => c.itemName).map(c => `${c.gstRate ?? 18}%`))]
+  const grandTotalAmount = computedTotalCost + totalGstAmount
+  const allGstRates = [
+    ...collaterals.filter(c => c.itemName).map(c => c.gstRate ?? 18),
+    ...(draftItemTotal > 0 ? [draftItemGstRate] : [])
+  ]
+  const uniqueItemGstRates = [...new Set(allGstRates.map(r => `${r}%`))]
 
   const validate = () => {
     const errs: Record<string, string> = {}
@@ -508,6 +554,28 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     e.preventDefault()
     if (!validate()) { toast.error("Please fix the errors before saving"); return }
     if (!project) return
+
+    // Include any pending item currently in the Add Item form
+    let effectiveCollaterals = [...collaterals]
+    if (showAddItemForm && selectedRateCardItem && parseInt(newItemQuantity) > 0) {
+      const rateCard = rateCardItems.find(r => r.id === selectedRateCardItem)
+      if (rateCard) {
+        const qty = parseInt(newItemQuantity)
+        const unitPrice = typeof newItemUnitPrice === "number" ? newItemUnitPrice : (parseFloat(newItemUnitPrice) || getUnitPriceFromRateCard(rateCard.name, qty))
+        const gstRate = rateCard.gstRate ?? 18
+        const totalPrice = unitPrice * qty
+        effectiveCollaterals.push({
+          id: Math.random().toString(36).substring(2, 9),
+          itemName: rateCard.name,
+          quantity: qty,
+          unitPrice,
+          totalPrice,
+          gstRate,
+          gstAmount: totalPrice * (gstRate / 100),
+          specification: newItemSpecification.trim() || "",
+        })
+      }
+    }
 
     setIsLoading(true)
     try {
@@ -527,7 +595,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           recipientContact: formData.recipientContact || null,
           recipientBranch: formData.recipientBranch || null,
           // Send all collaterals
-          collaterals: collaterals.map(c => ({
+          collaterals: effectiveCollaterals.map(c => ({
             id: c.id,
             itemName: c.itemName,
             quantity: c.quantity,
@@ -555,7 +623,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
         const originalCollaterals = project.collaterals
           ?.filter(c => c.itemName !== 'Packaging Charges' && c.itemName !== 'Packing Charges')
           .map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" })) || []
-        const updatedCollaterals = collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
+        const updatedCollaterals = effectiveCollaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
 
         const sortCollateral = (a: { itemName: string; quantity: number }, b: { itemName: string; quantity: number }) =>
           a.itemName.localeCompare(b.itemName) || a.quantity - b.quantity
@@ -966,12 +1034,12 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                         marginBottom: '16px'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', flexWrap: 'wrap' }}>
                         <select
                           className="form-select"
                           value={selectedRateCardItem}
-                          onChange={(e) => setSelectedRateCardItem(e.target.value)}
-                          style={{ flex: 2, marginBottom: 0, height: '38.5px', boxSizing: 'border-box', paddingTop: 0, paddingBottom: 0 }}
+                          onChange={(e) => handleRateCardItemChange(e.target.value, newItemQuantity)}
+                          style={{ flex: 2, minWidth: '160px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box', paddingTop: 0, paddingBottom: 0 }}
                         >
                           <option value="">Select item...</option>
                           {rateCardItems.map((item) => (
@@ -984,17 +1052,75 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                           value={newItemSpecification}
                           onChange={(e) => setNewItemSpecification(e.target.value)}
                           placeholder="Item Description"
-                          style={{ flex: 1.2, fontSize: '13px', padding: '8px 12px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box' }}
+                          style={{ flex: 1.5, minWidth: '140px', fontSize: '13px', padding: '8px 12px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box' }}
                         />
                         <input
                           type="number"
                           className="form-input"
                           value={newItemQuantity}
-                          onChange={(e) => setNewItemQuantity(e.target.value)}
+                          onChange={(e) => handleNewItemQuantityChange(e.target.value)}
                           placeholder="Qty"
                           min="1"
-                          style={{ flex: 1.5, marginBottom: 0, height: '38.5px', maxWidth: '140px', boxSizing: 'border-box' }}
+                          style={{ width: '90px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box', textAlign: 'center' }}
                         />
+                        {/* Rate / Unit Input (Editable for Admin, Auto/Read-only for POC) */}
+                        {effectiveIsAdmin ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="form-input"
+                            value={newItemUnitPrice}
+                            onChange={(e) => setNewItemUnitPrice(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
+                            placeholder="Rate"
+                            style={{ width: '105px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box', textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: '13px' }}
+                            title="Edit Rate / Unit (Admin Only)"
+                          />
+                        ) : (
+                          <div
+                            title="Auto-set from rate card"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              height: '38.5px',
+                              padding: '0 10px',
+                              minWidth: '95px',
+                              background: 'var(--gray-100)',
+                              border: '1px solid var(--gray-300)',
+                              borderRadius: '6px',
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              fontSize: '13px',
+                              color: (typeof newItemUnitPrice === "number" && newItemUnitPrice > 0) ? 'var(--gray-800)' : 'var(--gray-400)',
+                              boxSizing: 'border-box',
+                              userSelect: 'none',
+                            }}
+                          >
+                            {(typeof newItemUnitPrice === "number" && newItemUnitPrice > 0) ? `₹${newItemUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                          </div>
+                        )}
+                        {/* Total Price for this item */}
+                        <div
+                          title="Item Total"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            height: '38.5px',
+                            padding: '0 10px',
+                            minWidth: '105px',
+                            background: 'var(--gray-200)',
+                            borderRadius: '6px',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            color: 'var(--gray-900)',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          ₹{((parseInt(newItemQuantity) || 0) * (typeof newItemUnitPrice === "number" ? newItemUnitPrice : (parseFloat(newItemUnitPrice) || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
                         <button
                           type="button"
                           onClick={addCollateral}
@@ -1021,6 +1147,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                             setSelectedRateCardItem('')
                             setNewItemQuantity('')
                             setNewItemSpecification('')
+                            setNewItemUnitPrice('')
                           }}
                           style={{
                             padding: '6px',
@@ -1087,7 +1214,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                               style={{ flex: 1.2, fontSize: '13px', padding: '8px 12px', marginBottom: 0, height: '38.5px', boxSizing: 'border-box' }}
                             />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {isAdmin && (
+                              {effectiveIsAdmin && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <span style={{ fontSize: '10px', color: 'var(--gray-500)', fontWeight: 600 }}>Rate / Unit</span>
                                   <input
@@ -1107,7 +1234,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                                 </div>
                               )}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                {isAdmin && <span style={{ fontSize: '10px', color: 'var(--gray-500)', fontWeight: 600 }}>Qty</span>}
+                                {effectiveIsAdmin && <span style={{ fontSize: '10px', color: 'var(--gray-500)', fontWeight: 600 }}>Qty</span>}
                                 <input
                                   type="number"
                                   className="form-input"
@@ -1399,7 +1526,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                       {/* Total Base Cost */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', background: 'rgba(0,0,0,0.02)', padding: '4px 0', margin: '4px 0' }}>
                         <span style={{ color: 'var(--gray-700)', fontWeight: 600 }}>Total Base Cost:</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>₹{totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>₹{computedTotalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
 
                       {/* GST on Items */}

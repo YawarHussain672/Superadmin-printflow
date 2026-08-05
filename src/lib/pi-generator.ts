@@ -131,36 +131,36 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === DETAILS SECTION ===
   const detailsY = 24
-  const boxHeight = 35
+  const boxHeight = 37
   const colWidth = (pageWidth - 20) / 2
 
   // Customer Box (Left)
   doc.setFont("times", "bold")
   doc.setFontSize(10)
-  doc.text("Customer", 12, detailsY + 6)
+  doc.text("Customer", 12, detailsY + 5.5)
 
   doc.setFont("times", "normal")
   doc.setFontSize(9)
-  let custY = detailsY + 12
+  let custY = detailsY + 11.2
   doc.setFont("times", "bold")
   doc.text(companyName, 12, custY)
   doc.setFont("times", "normal")
 
   const branchLines = doc.splitTextToSize(branchLocation, colWidth - 4)
   for (const line of branchLines) {
-    custY += 4.0
+    custY += 3.8
     doc.text(line, 12, custY)
   }
 
-  custY += 4.0
+  custY += 3.8
   doc.text(`${companyLocation}-${companyState}, INDIA`, 12, custY)
   
   if (clientPan) {
-    custY += 4.0
+    custY += 3.8
     doc.text(`PAN/IT NO:${clientPan}`, 12, custY)
   }
   if (clientGst) {
-    custY += 4.0
+    custY += 3.8
     doc.text(`GST No.${clientGst}`, 12, custY)
   }
 
@@ -168,77 +168,75 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   const rightBoxX = 10 + colWidth
   doc.setFont("times", "bold")
   doc.setFontSize(10)
-  doc.text("Proforma Details", rightBoxX + 2, detailsY + 6)
+  doc.text("Proforma Details", rightBoxX + 2, detailsY + 5.5)
 
   doc.setFont("times", "normal")
   doc.setFontSize(9)
   const labelX = rightBoxX + 2
-  const valueX = rightBoxX + 35
+  const valueX = rightBoxX + 26
 
-  doc.text("No.", labelX, detailsY + 12)
-  doc.text(project.piNumber, valueX, detailsY + 12)
+  doc.text("No.", labelX, detailsY + 11.2)
+  doc.text(project.piNumber, valueX, detailsY + 11.2)
 
-  doc.text("Date:-", labelX, detailsY + 16)
-  doc.text(project.generatedAt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }), valueX, detailsY + 16)
+  doc.text("Date:-", labelX, detailsY + 14.7)
+  doc.text(project.generatedAt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }), valueX, detailsY + 14.7)
 
-  doc.text("Revise Date", labelX, detailsY + 20)
+  doc.text("Revise Date", labelX, detailsY + 18.2)
 
-  doc.text("Job Name :-", labelX, detailsY + 24)
-  doc.setFont("times", "bold")
-  const maxJobNameWidth = (10 + colWidth * 2) - valueX - 2
-  
+  // Calculate Job Name lines & dynamic font size (max 2 lines with 67mm width, aligned at valueX)
+  const jobNameMaxWidth = (10 + colWidth * 2) - valueX - 2
   let jobNameFontSize = 9
   doc.setFontSize(jobNameFontSize)
-  let jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
+  let jobNameLines = doc.splitTextToSize(project.name, jobNameMaxWidth)
   
-  if (jobNameLines.length > 1) {
+  if (jobNameLines.length > 2) {
     jobNameFontSize = 7.5
     doc.setFontSize(jobNameFontSize)
-    jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
+    jobNameLines = doc.splitTextToSize(project.name, jobNameMaxWidth)
   }
   if (jobNameLines.length > 2) {
-    jobNameFontSize = 6.5
+    jobNameFontSize = 6.8
     doc.setFontSize(jobNameFontSize)
-    jobNameLines = doc.splitTextToSize(project.name, maxJobNameWidth)
+    jobNameLines = doc.splitTextToSize(project.name, jobNameMaxWidth)
+  }
+  if (jobNameLines.length > 2) {
+    jobNameLines = [jobNameLines[0], jobNameLines[1].replace(/(\.\.\.)?$/, '...')]
   }
 
-  let startJobY = detailsY + 24
-  let jobLineStep = 0
-  let contactY = detailsY + 29
+  const jobNameStartY = 21.7
+  const jobLineStep = jobNameLines.length > 1 ? 2.6 : 0
 
-  if (jobNameLines.length === 2) {
-    startJobY = detailsY + 23.5
-    jobLineStep = 2.7
-    contactY = detailsY + 30.5
-  } else if (jobNameLines.length >= 3) {
-    startJobY = detailsY + 23.0
-    jobLineStep = 2.4
-    contactY = detailsY + 32.0
-  }
+  doc.setFont("times", "normal")
+  doc.setFontSize(9)
+  doc.text("Job Name :-", labelX, detailsY + jobNameStartY)
+
+  doc.setFont("times", "bold")
+  doc.setFontSize(jobNameFontSize)
 
   jobNameLines.forEach((line: string, index: number) => {
-    const lineY = startJobY + (index * jobLineStep)
+    const lineY = detailsY + jobNameStartY + (index * jobLineStep)
     doc.text(line, valueX, lineY)
     const lineWidth = doc.getTextWidth(line)
     doc.setLineWidth(0.1)
-    doc.line(valueX, lineY + 0.6, valueX + lineWidth, lineY + 0.6)
+    doc.line(valueX, lineY + 0.5, valueX + lineWidth, lineY + 0.5)
   })
 
-  // Restore font size & style for contact person
+  // Position Contact Person cleanly below Job Name with all values aligned at valueX
+  const contactPersonY = jobNameLines.length > 1 ? detailsY + 29.5 : detailsY + 27.5
   doc.setFontSize(9)
   doc.setFont("times", "normal")
-  doc.text("Contact Person:-", labelX, contactY)
-  doc.text(project.pocName || "", valueX, contactY)
+  doc.text("Contact Person:-", labelX, contactPersonY)
+  doc.text(project.pocName || "", valueX, contactPersonY)
 
   // Draw Boxes for Details
   doc.setLineWidth(0.1)
   // Customer Rect
   doc.rect(10, detailsY, colWidth, boxHeight)
-  doc.line(10, detailsY + 8, 10 + colWidth, detailsY + 8) // Header line
+  doc.line(10, detailsY + 7.5, 10 + colWidth, detailsY + 7.5) // Header line
 
   // Proforma Rect
   doc.rect(10 + colWidth, detailsY, colWidth, boxHeight)
-  doc.line(10 + colWidth, detailsY + 8, 10 + colWidth * 2, detailsY + 8) // Header line
+  doc.line(10 + colWidth, detailsY + 7.5, 10 + colWidth * 2, detailsY + 7.5) // Header line
 
   // === SECOND ROW BOXES ===
   const secondRowY = detailsY + boxHeight + 2
