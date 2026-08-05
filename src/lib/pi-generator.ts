@@ -131,7 +131,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
 
   // === DETAILS SECTION ===
   const detailsY = 24
-  const boxHeight = 37
+  let boxHeight = 37
   const colWidth = (pageWidth - 20) / 2
 
   // Customer Box (Left)
@@ -204,7 +204,7 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   }
 
   const jobNameStartY = 21.7
-  const jobLineStep = jobNameLines.length > 1 ? 2.6 : 0
+  const jobLineStep = jobNameFontSize >= 9 ? 3.8 : 3.2
 
   doc.setFont("times", "normal")
   doc.setFontSize(9)
@@ -218,11 +218,19 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
     doc.text(line, valueX, lineY)
     const lineWidth = doc.getTextWidth(line)
     doc.setLineWidth(0.1)
-    doc.line(valueX, lineY + 0.5, valueX + lineWidth, lineY + 0.5)
+    doc.line(valueX, lineY + 0.4, valueX + lineWidth, lineY + 0.4)
   })
 
-  // Position Contact Person cleanly below Job Name with all values aligned at valueX
-  const contactPersonY = jobNameLines.length > 1 ? detailsY + 29.5 : detailsY + 27.5
+  // Dynamic box height calculation based on job name and contact person lines
+  let contactPersonY = detailsY + 27.5
+  if (jobNameLines.length > 1) {
+    contactPersonY = detailsY + jobNameStartY + ((jobNameLines.length - 1) * jobLineStep) + 4.8
+  }
+
+  // Calculate box height dynamically so it never overflows
+  const requiredRightHeight = Math.max(37, (contactPersonY - detailsY) + 5)
+  boxHeight = requiredRightHeight
+
   doc.setFontSize(9)
   doc.setFont("times", "normal")
   doc.text("Contact Person:-", labelX, contactPersonY)
