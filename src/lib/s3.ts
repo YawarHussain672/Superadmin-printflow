@@ -33,7 +33,13 @@ export async function uploadToS3(
   return `${baseUrl}/${key}`;
 }
 
-export async function deleteFromS3(key: string): Promise<void> {
+export async function deleteFromS3(keyOrUrl: string): Promise<void> {
+  let key = keyOrUrl;
+  if (keyOrUrl.includes("http://") || keyOrUrl.includes("https://")) {
+    const extracted = getS3KeyFromUrl(keyOrUrl);
+    if (extracted) key = extracted;
+  }
+
   const command = new DeleteObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,

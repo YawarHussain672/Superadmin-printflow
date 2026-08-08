@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { FileType } from "@prisma/client"
-import { uploadToS3, getPresignedUrl } from "@/lib/s3"
+import { uploadToS3, deleteFromS3, getPresignedUrl } from "@/lib/s3"
 import { logActivity } from "@/lib/audit"
 import { pusherServer, CHANNELS, EVENTS } from "@/lib/pusher"
 
@@ -48,8 +48,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "POCs can upload documents only after admin approves the project" }, { status: 403 })
     }
 
-    if (["PO", "CHALLAN", "INVOICE"].includes(fileType) && !["APPROVED", "PRINTING", "DISPATCHED", "DELIVERED"].includes(project.status)) {
-      return NextResponse.json({ error: `${fileType} can only be uploaded after project approval` }, { status: 400 })
+    // If replacing an existing file of the same type, delete old file from S3 & DB
+    const existingFile = await prisma.fileUpload.findFirst({
+      where: { projectId, type: fileType as FileType },
+    })
+
+    if (existingFile) {
+      try {
+        const urlParts = existingFile.url.split(".amazonaws.com/")
+        if (urlParts.length > 1) {
+          const key = decodeURIComponent(urlParts[1])
+          await deleteFromS3(key)
+        }
+      } catch (s3Error) {
+        console.error("Failed to delete previous file from S3:", s3Error)
+      }
+
+      await prisma.fileUpload.delete({
+        where: { id: existingFile.id },
+      })
     }
 
     // Upload to S3

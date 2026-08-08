@@ -53,7 +53,7 @@ export async function POST(
       include: {
         collaterals: true,
         poc: {
-          select: { name: true, email: true, location: true },
+          select: { name: true, email: true, location: true, branch: true },
         },
         client: {
           select: { name: true, email: true, location: true, phone: true, clientPan: true, clientGst: true },
@@ -87,6 +87,7 @@ export async function POST(
       piNumber: piNumber,
       location: project.location,
       state: project.state,
+      branch: project.branch,
       totalCost: project.totalCost,
       packingCharges: project.packingCharges,
       packingChargesGstRate: project.packingChargesGstRate,
@@ -94,12 +95,12 @@ export async function POST(
       deliveryChargesGstRate: project.deliveryChargesGstRate,
       pocName: project.poc?.name || project.pocName || undefined,
       pocEmail: project.poc?.email || undefined,
+      poc: project.poc,
       clientName: project.client?.name || project.clientName || undefined,
       clientEmail: project.client?.email || undefined,
       clientLocation: project.client?.location || undefined,
       clientPan: project.client?.clientPan || undefined,
       clientGst: project.client?.clientGst || undefined,
-      deliveryAddress: `${project.location}${project.state ? `, ${project.state}` : ""}`,
       recipientName: project.recipientName,
       recipientContact: project.recipientContact,
       recipientBranch: project.recipientBranch,

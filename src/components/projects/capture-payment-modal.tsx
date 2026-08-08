@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, CheckCircle2, CreditCard, Upload, FileText, X } from "lucide-react"
+import { UndoPaymentModal } from "@/components/projects/undo-payment-modal"
 
 interface CapturePaymentModalProps {
   projectId: string
@@ -36,6 +37,7 @@ export function CapturePaymentModal({
   const [notes, setNotes] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPostCaptureUndoModal, setShowPostCaptureUndoModal] = useState(false)
 
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen
 
@@ -45,7 +47,7 @@ export function CapturePaymentModal({
 
   const handleClose = () => {
     if (externalOnClose) externalOnClose()
-    else setInternalIsOpen(false)
+    if (externalIsOpen === undefined) setInternalIsOpen(false)
     setTransactionId("")
     setNotes("")
     setSelectedFile(null)
@@ -72,8 +74,8 @@ export function CapturePaymentModal({
         throw new Error(data.error || "Failed to capture payment")
       }
 
-      toast.success(data.message || "Payment captured successfully!")
       handleClose()
+      toast.success(data.message || "Payment captured successfully!")
       if (onSuccess) onSuccess()
       router.refresh()
     } catch (err) {

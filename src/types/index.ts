@@ -62,6 +62,9 @@ export interface Project {
   updatedAt: Date
   pocId: string
   poc?: User
+  recipientName?: string | null
+  recipientContact?: string | null
+  recipientBranch?: string | null
   collaterals?: Collateral[]
   statusHistory?: StatusHistory[]
   files?: FileUpload[]

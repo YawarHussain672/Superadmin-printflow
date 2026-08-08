@@ -34,6 +34,7 @@ interface Project {
   recipientName?: string | null
   recipientContact?: string | null
   recipientBranch?: string | null
+  instructions?: string | null
 }
 
 interface POC {
@@ -104,6 +105,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null)
   const [sameAsPoc, setSameAsPoc] = useState(false)
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null)
 
   const [cities, setCities] = useState<string[]>(CITIES)
   const [branchLocations, setBranchLocations] = useState<Record<string, { state: string; branches: string[] }>>(BRANCH_LOCATIONS)
@@ -123,6 +125,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
     recipientName: "",
     recipientContact: "",
     recipientBranch: "",
+    instructions: "",
   })
 
   // State for collaterals (items) with prices
@@ -251,15 +254,20 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           recipientName: project.recipientName || "",
           recipientContact: project.recipientContact || "",
           recipientBranch: project.recipientBranch || "",
+          instructions: project.instructions || "",
         })
 
         const selectedPoc = teamData.find(p => p.id === project.pocId)
         const isSame = Boolean(
           project.recipientName &&
           selectedPoc &&
-          project.recipientName === selectedPoc.name &&
-          (project.recipientContact === selectedPoc.email || project.recipientContact === selectedPoc.phone) &&
-          (project.recipientBranch === selectedPoc.branch || project.recipientBranch === selectedPoc.location)
+          project.recipientName.trim().toLowerCase() === selectedPoc.name.trim().toLowerCase() &&
+          (!project.recipientContact || project.recipientContact === selectedPoc.email || project.recipientContact === selectedPoc.phone) &&
+          (!project.recipientBranch ||
+            project.recipientBranch === selectedPoc.branch ||
+            project.recipientBranch === selectedPoc.location ||
+            (selectedPoc.branch && project.recipientBranch.includes(selectedPoc.branch)) ||
+            (selectedPoc.location && project.recipientBranch.includes(selectedPoc.location)))
         )
         setSameAsPoc(isSame)
 
@@ -300,6 +308,31 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
         setDeliveryChargesGstRate(loadedDeliveryGstRate)
 
         updateTotalCost(loadedCollaterals, loadedPackingCharges, loadedDeliveryCharges)
+
+        const initialData = {
+          name: project.name || "",
+          pocId: project.pocId || "",
+          clientId: project.clientId || "",
+          location: project.location || "",
+          branch: project.branch || "",
+          status: project.status?.toLowerCase() || "requested",
+          material: project.material || project.collaterals?.[0]?.itemName || "",
+          quantity: project.quantity?.toString() || project.collaterals?.[0]?.quantity?.toString() || "",
+          courier: project.dispatch?.courier || "-",
+          deliveryDate: project.deliveryDate ? project.deliveryDate.split("T")[0] : "",
+          recipientName: project.recipientName || "",
+          recipientContact: project.recipientContact || "",
+          recipientBranch: project.recipientBranch || "",
+          instructions: project.instructions || "",
+        }
+        setInitialSnapshot(JSON.stringify({
+          formData: initialData,
+          collaterals: loadedCollaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, unitPrice: c.unitPrice, specification: c.specification || "" })),
+          packingCharges: loadedPackingCharges,
+          packingChargesGstRate: loadedPackingGstRate,
+          deliveryCharges: loadedDeliveryCharges,
+          deliveryChargesGstRate: loadedDeliveryGstRate,
+        }))
         setLoadedProjectId(project.id)
       } catch {
         toast.error("Failed to load form data")
@@ -533,6 +566,16 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
   const allGstRates = collaterals.filter(c => c.itemName).map(c => c.gstRate ?? 18)
   const uniqueItemGstRates = [...new Set(allGstRates.map(r => `${r}%`))]
 
+  const currentSnapshot = JSON.stringify({
+    formData,
+    collaterals: collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, unitPrice: c.unitPrice, specification: c.specification || "" })),
+    packingCharges,
+    packingChargesGstRate,
+    deliveryCharges,
+    deliveryChargesGstRate,
+  })
+  const isDirty = initialSnapshot !== null && currentSnapshot !== initialSnapshot
+
   const validate = () => {
     const errs: Record<string, string> = {}
     if (!formData.name.trim() || formData.name.trim().length < 3) errs.name = "Project name must be at least 3 characters"
@@ -566,6 +609,8 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
 
     setIsLoading(true)
     try {
+      const targetState = BRANCH_LOCATIONS[formData.location]?.state || branchLocations[formData.location]?.state || formData.location
+
       const res = await fetch(`/api/projects/${project.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -575,12 +620,14 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           clientId: formData.clientId,
           location: formData.location,
           branch: formData.branch,
+          state: targetState,
           deliveryDate: formData.deliveryDate,
           // Status is visible to all (matching HTML reference)
           status: formData.status.toUpperCase(),
           recipientName: formData.recipientName || null,
           recipientContact: formData.recipientContact || null,
           recipientBranch: formData.recipientBranch || null,
+          instructions: formData.instructions || null,
           // Send ONLY explicitly added collaterals
           collaterals: collaterals.map(c => ({
             id: c.id,
@@ -644,6 +691,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
         const clientIdChanged = formData.clientId !== (project.clientId || "")
         const locationChanged = formData.location !== (project.location || "")
         const branchChanged = formData.branch !== (project.branch || "")
+        const stateChanged = targetState !== (project.state || "")
         const statusChanged = formData.status.toUpperCase() !== (project.status || "").toUpperCase()
         const deliveryDateChanged = (formData.deliveryDate || "") !== (project.deliveryDate ? project.deliveryDate.split("T")[0] : "")
 
@@ -652,6 +700,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
           clientIdChanged ||
           locationChanged ||
           branchChanged ||
+          stateChanged ||
           statusChanged ||
           deliveryDateChanged ||
           collateralsChanged ||
@@ -865,14 +914,14 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                           setSameAsPoc(checked)
                           if (checked) {
                             const selectedPoc = pocs.find(p => p.id === formData.pocId)
-                            if (selectedPoc) {
-                              setFormData(prev => ({
-                                ...prev,
-                                recipientName: selectedPoc.name,
-                                recipientContact: selectedPoc.email || selectedPoc.phone || "",
-                                recipientBranch: selectedPoc.branch || selectedPoc.location || "",
-                              }))
-                            }
+                            const bText = selectedPoc?.branch || formData.branch || ""
+                            const lText = selectedPoc?.location || formData.location || ""
+                            setFormData(prev => ({
+                              ...prev,
+                              recipientName: selectedPoc?.name || "",
+                              recipientContact: selectedPoc?.email || selectedPoc?.phone || "",
+                              recipientBranch: bText && lText ? `${bText}, ${lText}` : (bText || lText || ""),
+                            }))
                           } else {
                             setFormData(prev => ({
                               ...prev,
@@ -1580,8 +1629,28 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                   />
                   {errors.deliveryDate && <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{errors.deliveryDate}</p>}
                 </div>
-
-
+                {/* Special Instructions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gray-700)' }}>Special Instructions</label>
+                  <textarea
+                    rows={3}
+                    value={formData.instructions}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, instructions: e.target.value })}
+                    placeholder="E.g., Delivery between 9 AM - 5 PM only, Handle with care, Contact POC before dispatch..."
+                    style={{
+                      padding: '11px 14px',
+                      border: '1px solid var(--gray-300)',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      fontFamily: 'var(--font-sans)',
+                      outline: 'none',
+                      width: '100%',
+                      minHeight: '80px',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Form Buttons - Outside form-grid for proper alignment */}
@@ -1592,8 +1661,15 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess, isAd
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={isLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                  disabled={isLoading || !isDirty}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: (isLoading || !isDirty) ? 0.5 : 1,
+                    cursor: (isLoading || !isDirty) ? 'not-allowed' : 'pointer',
+                  }}
+                  title={!isDirty ? "No changes made to save" : undefined}
                 >
                   {isLoading ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>

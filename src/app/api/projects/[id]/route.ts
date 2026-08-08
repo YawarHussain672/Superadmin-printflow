@@ -10,6 +10,7 @@ import { formatCurrency } from "@/utils/formatters"
 import { calculateTotal } from "@/lib/ratecard"
 import { deleteFromS3, uploadToS3 } from "@/lib/s3"
 import { generatePIPDF } from "@/lib/pi-generator"
+import { BRANCH_LOCATIONS } from "@/lib/branch-locations"
 
 function getS3KeyFromUrl(url: string | null | undefined): string | null {
   if (!url) return null
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const project = await prisma.project.findUnique({
       where: { id },
       include: {
-        poc: { select: { id: true, name: true, email: true, phone: true, role: true } },
+        poc: { select: { id: true, name: true, email: true, phone: true, role: true, location: true, branch: true } },
         client: { select: { id: true, name: true, email: true, phone: true, role: true } },
         tenantClient: { select: { id: true, companyName: true, companyLogoUrl: true } },
         collaterals: true,
@@ -225,12 +226,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Check if any details affecting PI have changed (only if project already has a PI number)
     let detailsChanged = false
     if (existing.piNumber) {
-      const nameChanged = name !== undefined && name !== existing.name
-      const pocIdChanged = pocId !== undefined && pocId !== existing.pocId
-      const clientIdChanged = clientId !== undefined && clientId !== existing.clientId
-      const locationChanged = location !== undefined && location !== existing.location
-      const branchChanged = branch !== undefined && branch !== existing.branch
-      const stateChanged = state !== undefined && state !== existing.state
+      const norm = (val?: string | null) => (val?.trim() || null)
+
+      const nameChanged = name !== undefined && norm(name) !== norm(existing.name)
+      const pocIdChanged = pocId !== undefined && (pocId || null) !== (existing.pocId || null)
+      const clientIdChanged = clientId !== undefined && (clientId || null) !== (existing.clientId || null)
+      const locationChanged = location !== undefined && norm(location) !== norm(existing.location)
+      const branchChanged = branch !== undefined && norm(branch) !== norm(existing.branch)
+      const stateChanged = state !== undefined && norm(state) !== norm(existing.state)
       
       const existingDateStr = existing.deliveryDate ? new Date(existing.deliveryDate).toISOString().split('T')[0] : ""
       let newDateStr = ""
@@ -241,19 +244,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       const deliveryDateChanged = deliveryDate !== undefined && newDateStr !== existingDateStr
 
-      const instructionsChanged = instructions !== undefined && instructions !== existing.instructions
-      const packingChargesChanged = packingCharges !== undefined && packingCharges !== existing.packingCharges
-      const packingChargesGstRateChanged = packingChargesGstRate !== undefined && packingChargesGstRate !== existing.packingChargesGstRate
-      const deliveryChargesChanged = deliveryCharges !== undefined && deliveryCharges !== existing.deliveryCharges
-      const deliveryChargesGstRateChanged = deliveryChargesGstRate !== undefined && deliveryChargesGstRate !== existing.deliveryChargesGstRate
-      const recipientNameChanged = recipientName !== undefined && recipientName !== existing.recipientName
-      const recipientContactChanged = recipientContact !== undefined && recipientContact !== existing.recipientContact
-      const recipientBranchChanged = recipientBranch !== undefined && recipientBranch !== existing.recipientBranch
+      const packingChargesChanged = packingCharges !== undefined && (packingCharges || 0) !== (existing.packingCharges || 0)
+      const packingChargesGstRateChanged = packingChargesGstRate !== undefined && (packingChargesGstRate ?? 18) !== (existing.packingChargesGstRate ?? 18)
+      const deliveryChargesChanged = deliveryCharges !== undefined && (deliveryCharges || 0) !== (existing.deliveryCharges || 0)
+      const deliveryChargesGstRateChanged = deliveryChargesGstRate !== undefined && (deliveryChargesGstRate ?? 18) !== (existing.deliveryChargesGstRate ?? 18)
+      const recipientNameChanged = recipientName !== undefined && norm(recipientName) !== norm(existing.recipientName)
+      const recipientContactChanged = recipientContact !== undefined && norm(recipientContact) !== norm(existing.recipientContact)
+      const recipientBranchChanged = recipientBranch !== undefined && norm(recipientBranch) !== norm(existing.recipientBranch)
 
       let collateralsChanged = false
       if (collaterals !== undefined) {
-        const origCols = existing.collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
-        const newCols = collaterals.map((c: any) => ({ itemName: c.itemName, quantity: c.quantity, specification: c.specification || "" }))
+        const origCols = existing.collaterals.map(c => ({ itemName: c.itemName, quantity: c.quantity, unitPrice: c.unitPrice, specification: c.specification || "" }))
+        const newCols = collaterals.map((c: any) => ({ itemName: c.itemName, quantity: c.quantity, unitPrice: c.unitPrice, specification: c.specification || "" }))
         
         const sortCollateral = (a: { itemName: string; quantity: number }, b: { itemName: string; quantity: number }) =>
           a.itemName.localeCompare(b.itemName) || a.quantity - b.quantity
@@ -262,11 +264,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         newCols.sort(sortCollateral)
 
         collateralsChanged = origCols.length !== newCols.length ||
-          origCols.some((item, idx) => item.itemName !== newCols[idx].itemName || item.quantity !== newCols[idx].quantity || item.specification !== newCols[idx].specification)
+          origCols.some((item, idx) => item.itemName !== newCols[idx].itemName || item.quantity !== newCols[idx].quantity || Math.abs(item.unitPrice - newCols[idx].unitPrice) > 0.001 || item.specification !== newCols[idx].specification)
       }
 
       detailsChanged = nameChanged || pocIdChanged || clientIdChanged || locationChanged || branchChanged || stateChanged ||
-        deliveryDateChanged || instructionsChanged || packingChargesChanged || packingChargesGstRateChanged ||
+        deliveryDateChanged || packingChargesChanged || packingChargesGstRateChanged ||
         deliveryChargesChanged || deliveryChargesGstRateChanged ||
         recipientNameChanged || recipientContactChanged || recipientBranchChanged || collateralsChanged
     }
@@ -325,9 +327,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         updateData.clientName = client.name
       }
     }
-    if (location !== undefined) updateData.location = location
+    if (location !== undefined) {
+      updateData.location = location
+      if (state !== undefined) {
+        updateData.state = state
+      } else if (BRANCH_LOCATIONS[location]?.state) {
+        updateData.state = BRANCH_LOCATIONS[location].state
+      }
+    } else if (state !== undefined) {
+      updateData.state = state
+    }
     if (branch !== undefined) updateData.branch = branch
-    if (state !== undefined) updateData.state = state
     if (deliveryDate !== undefined) updateData.deliveryDate = new Date(deliveryDate)
     if (instructions !== undefined) updateData.instructions = instructions
     if (packingCharges !== undefined) updateData.packingCharges = packingCharges
@@ -537,7 +547,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             clientLocation: freshProject.client?.location || undefined,
             clientPan: freshProject.client?.clientPan || undefined,
             clientGst: freshProject.client?.clientGst || undefined,
-            deliveryAddress: `${freshProject.location}${freshProject.state ? `, ${freshProject.state}` : ""}`,
             recipientName: freshProject.recipientName,
             recipientContact: freshProject.recipientContact,
             recipientBranch: freshProject.recipientBranch,

@@ -359,7 +359,8 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                       className={`form-select ${errors.pocId ? 'border-red-400' : ''}`}
                       value={formData.pocId}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                        const selectedPoc = pocs.find(p => p.id === e.target.value)
+                        const newPocId = e.target.value
+                        const selectedPoc = pocs.find(p => p.id === newPocId)
                         let matchedCity = formData.city
                         let matchedBranch = formData.branch
 
@@ -381,11 +382,21 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                           }
                         }
 
-                        setFormData({
-                          ...formData,
-                          pocId: e.target.value,
-                          city: matchedCity,
-                          branch: matchedBranch,
+                        setFormData(prev => {
+                          const updated = {
+                            ...prev,
+                            pocId: newPocId,
+                            city: matchedCity,
+                            branch: matchedBranch,
+                          }
+                          if (prev.sameAsPoc && selectedPoc) {
+                            const bText = selectedPoc.branch || matchedBranch || ""
+                            const lText = selectedPoc.location || matchedCity || ""
+                            updated.recipientName = selectedPoc.name
+                            updated.recipientContact = selectedPoc.email || selectedPoc.phone || ""
+                            updated.recipientBranch = bText && lText ? `${bText}, ${lText}` : (bText || lText || "")
+                          }
+                          return updated
                         });
                         setErrors({ ...errors, pocId: "" })
                       }}
@@ -763,26 +774,25 @@ export function NewProjectForm({ onSuccess, onCancel }: NewProjectFormProps) {
                   checked={formData.sameAsPoc}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const checked = e.target.checked
-                    setFormData({ ...formData, sameAsPoc: checked })
                     if (checked) {
                       const selectedPoc = pocs.find(p => p.id === formData.pocId)
-                      if (selectedPoc) {
-                        setFormData({
-                          ...formData,
-                          sameAsPoc: true,
-                          recipientName: selectedPoc.name,
-                          recipientContact: selectedPoc.email,
-                          recipientBranch: formData.branch,
-                        })
-                      }
+                      const bText = selectedPoc?.branch || formData.branch || ""
+                      const lText = selectedPoc?.location || formData.city || ""
+                      setFormData(prev => ({
+                        ...prev,
+                        sameAsPoc: true,
+                        recipientName: selectedPoc?.name || "",
+                        recipientContact: selectedPoc?.email || selectedPoc?.phone || "",
+                        recipientBranch: bText && lText ? `${bText}, ${lText}` : (bText || lText || ""),
+                      }))
                     } else {
-                      setFormData({
-                        ...formData,
+                      setFormData(prev => ({
+                        ...prev,
                         sameAsPoc: false,
                         recipientName: "",
                         recipientContact: "",
                         recipientBranch: "",
-                      })
+                      }))
                     }
                   }}
                   style={{ cursor: 'pointer' }}

@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Search, CreditCard, Mail, Loader2, Eye, FileText, IndianRupee, Calendar, UserCheck, FileSpreadsheet, Download } from "lucide-react"
+import { Search, CreditCard, Mail, Loader2, Eye, FileText, IndianRupee, Calendar, UserCheck, FileSpreadsheet, Download, RotateCcw } from "lucide-react"
 import { formatDate, formatCurrency } from "@/utils/formatters"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { CapturePaymentModal } from "@/components/projects/capture-payment-modal"
+import { UndoPaymentModal } from "@/components/projects/undo-payment-modal"
 import { exportToExcel } from "@/utils/excel-export"
 
 interface Collateral {
@@ -61,6 +62,8 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [searchQuery, setSearchQuery] = useState("")
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
+  const [undoTargetProject, setUndoTargetProject] = useState<{ id: string; projectId: string; name: string; autoCloseSeconds?: number } | null>(null)
+  const [undoingPaymentId, setUndoingPaymentId] = useState<string | null>(null)
 
   useEffect(() => {
     setProjects(initialProjects)
@@ -96,6 +99,25 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
       toast.error(err instanceof Error ? err.message : "Failed to send reminder")
     } finally {
       setSendingReminderId(null)
+    }
+  }
+
+  const handleUndoPayment = async (projectId: string, projectIdentifier: string) => {
+    if (!confirm(`Are you sure you want to undo payment capture for project ${projectIdentifier}? This will move the project back to Pending Payment status.`)) return
+
+    setUndoingPaymentId(projectId)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/undo-payment`, {
+        method: "POST",
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to undo payment capture")
+      toast.success(data.message || "Payment capture undone successfully!")
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to undo payment capture")
+    } finally {
+      setUndoingPaymentId(null)
     }
   }
 
@@ -158,6 +180,21 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
             View and manage projects with generated Tax Invoices waiting for payment capture
           </p>
         </div>
+
+        {undoTargetProject && (
+          <UndoPaymentModal
+            projectId={undoTargetProject.id}
+            projectIdentifier={undoTargetProject.projectId}
+            projectName={undoTargetProject.name}
+            open={!!undoTargetProject}
+            autoCloseSeconds={undoTargetProject.autoCloseSeconds}
+            onOpenChange={(open) => !open && setUndoTargetProject(null)}
+            onSuccess={() => {
+              setProjects((prev) => prev.filter((p) => p.id !== undoTargetProject.id))
+              setUndoTargetProject(null)
+            }}
+          />
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -444,15 +481,43 @@ export function OutstandingPaymentsClient({ initialProjects, userRole }: Outstan
                     </button>
                   )}
 
-                  <CapturePaymentModal
-                    projectId={project.id}
-                    projectIdentifier={project.projectId}
-                    projectName={project.name}
-                    grandTotal={grandTotal}
-                    onSuccess={() => {
-                      setProjects((prev) => prev.filter((p) => p.id !== project.id))
-                    }}
-                  />
+                  {project.paymentCaptured ? (
+                    <button
+                      type="button"
+                      onClick={() => setUndoTargetProject({ id: project.id, projectId: project.projectId, name: project.name })}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "8px 14px",
+                        borderRadius: "8px",
+                        border: "1px solid #fca5a5",
+                        backgroundColor: "#fee2e2",
+                        color: "#dc2626",
+                        fontWeight: 600,
+                        fontSize: "13px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <RotateCcw size={14} />
+                      Undo Payment
+                    </button>
+                  ) : (
+                    <CapturePaymentModal
+                      projectId={project.id}
+                      projectIdentifier={project.projectId}
+                      projectName={project.name}
+                      grandTotal={grandTotal}
+                      onSuccess={() => {
+                        setUndoTargetProject({
+                          id: project.id,
+                          projectId: project.projectId,
+                          name: project.name,
+                          autoCloseSeconds: 10,
+                        })
+                      }}
+                    />
+                  )}
 
                   <Link
                     href={`/projects/${project.id}`}

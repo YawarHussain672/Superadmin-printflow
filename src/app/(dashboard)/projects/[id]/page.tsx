@@ -14,8 +14,10 @@ import { PISection } from "@/components/projects/pi-section"
 import { TrackButton } from "@/components/dispatch/track-button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { CapturePaymentModal } from "@/components/projects/capture-payment-modal"
+import { UndoPaymentModal } from "@/components/projects/undo-payment-modal"
 import { toast } from "sonner"
 import { getPusherClient, CHANNELS, EVENTS } from "@/lib/pusher"
+import { formatDeliveryAddress } from "@/utils/address-formatter"
 
 // SVG Icons matching HTML exactly
 const ArrowLeftIcon = () => (
@@ -94,10 +96,13 @@ interface Project {
   paymentNotes?: string | null
   paymentReceiptUrl?: string | null
   paymentReceiptFilename?: string | null
-  poc?: { id: string; name: string; email: string; phone: string; role?: string } | null
+  poc?: { id: string; name: string; email: string; phone: string; role?: string; location?: string | null; branch?: string | null } | null
   client?: { id: string; name: string; email: string; phone: string; role?: string } | null
   pocName?: string | null
   clientName?: string | null
+  recipientName?: string | null
+  recipientContact?: string | null
+  recipientBranch?: string | null
   collaterals: { id: string; itemName: string; quantity: number; unitPrice: number; totalPrice: number; gstRate?: number | null; gstAmount?: number | null; specification?: string | null }[]
   statusHistory: { id: string; status: ProjectStatus; note: string | null; timestamp: string }[]
   files: ProjectFile[]
@@ -132,6 +137,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const [loading, setLoading] = useState(true)
   const [project, setProject] = useState<Project | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [undoPaymentModalOpen, setUndoPaymentModalOpen] = useState(false)
+  const [undoAutoCloseSeconds, setUndoAutoCloseSeconds] = useState<number | undefined>(undefined)
 
   const fetchProject = useCallback(async (): Promise<Project | null> => {
     try {
@@ -356,7 +363,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 projectIdentifier={project.projectId}
                 projectName={project.name}
                 grandTotal={project.grandTotal || project.totalCost * 1.18}
-                onSuccess={fetchProject}
+                onSuccess={async () => {
+                  setUndoAutoCloseSeconds(10)
+                  setUndoPaymentModalOpen(true)
+                  await fetchProject()
+                }}
               />
             )}
             {(canEditProject || canUpdateStatus || canDeleteProject || isAdmin) && (
@@ -454,7 +465,21 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           </div>
           <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
             <span className="detail-label">Delivery Address</span>
-            <span className="detail-value">Axis Max Life Insurance, {project.location}, {project.state}, India</span>
+            <div className="detail-value" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              {(() => {
+                const formatted = formatDeliveryAddress(project)
+                if (formatted.isCustom) {
+                  return (
+                    <>
+                      {formatted.name && <div><span style={{ fontWeight: 600, color: 'var(--gray-600)' }}>Name:</span> {formatted.name}</div>}
+                      {formatted.contact && <div><span style={{ fontWeight: 600, color: 'var(--gray-600)' }}>Contact:</span> {formatted.contact}</div>}
+                      <div><span style={{ fontWeight: 600, color: 'var(--gray-600)' }}>Address:</span> {formatted.addressText}</div>
+                    </>
+                  )
+                }
+                return <div>{formatted.singleLine}</div>
+              })()}
+            </div>
           </div>
           {project.description && (
             <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
@@ -1090,6 +1115,37 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                         </div>
                       </div>
                     )}
+                    {/* Undo Payment Capture Action (Admin or POC) */}
+                    {(isAdmin || (session?.user?.role === "POC" && project.pocId === session?.user?.id)) && (
+                      <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#dc2626',
+                            backgroundColor: '#fee2e2',
+                            border: '1px solid #fca5a5',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                          onClick={() => {
+                            setUndoAutoCloseSeconds(undefined)
+                            setUndoPaymentModalOpen(true)
+                          }}
+                        >
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                          Undo Payment Capture
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div
@@ -1119,7 +1175,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                         projectIdentifier={project.projectId}
                         projectName={project.name}
                         grandTotal={project.grandTotal || project.totalCost * 1.18}
-                        onSuccess={fetchProject}
+                        onSuccess={async () => {
+                          setUndoAutoCloseSeconds(10)
+                          setUndoPaymentModalOpen(true)
+                          await fetchProject()
+                        }}
                       />
                     )}
                   </div>
@@ -1165,6 +1225,19 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           onSuccess={(shouldRegeneratePI) => {
             handleProjectUpdated(shouldRegeneratePI)
           }}
+        />
+      )}
+
+      {/* Undo Payment Modal */}
+      {project && (
+        <UndoPaymentModal
+          projectId={project.id}
+          projectIdentifier={project.projectId}
+          projectName={project.name}
+          open={undoPaymentModalOpen}
+          onOpenChange={setUndoPaymentModalOpen}
+          autoCloseSeconds={undoAutoCloseSeconds}
+          onSuccess={fetchProject}
         />
       )}
     </div>

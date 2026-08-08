@@ -2,6 +2,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import sharp from "sharp"
 import { basePrisma } from "./prisma"
+import { formatDeliveryAddress } from "@/utils/address-formatter"
 
 interface CollateralItem {
   itemName: string
@@ -20,6 +21,7 @@ interface ProjectData {
   piNumber: string
   location: string
   state?: string | null
+  branch?: string | null
   totalCost: number
   packingCharges: number
   packingChargesGstRate: number
@@ -27,6 +29,13 @@ interface ProjectData {
   deliveryChargesGstRate?: number | null
   pocName?: string | null
   pocEmail?: string | null
+  poc?: {
+    id?: string
+    name?: string | null
+    email?: string | null
+    location?: string | null
+    branch?: string | null
+  } | null
   clientName?: string | null
   clientEmail?: string | null
   clientLocation?: string | null
@@ -258,24 +267,17 @@ export async function generatePIPDF(project: ProjectData): Promise<Buffer> {
   doc.text("Delivery Address", 12, secondRowY + 6)
   doc.setFont("times", "normal")
 
+  const formattedAddr = formatDeliveryAddress(project)
   const deliveryLines: string[] = []
-  if (project.recipientName) {
-    deliveryLines.push(`Name: ${project.recipientName.trim()}`)
-  }
-  if (project.recipientContact) {
-    deliveryLines.push(`Contact: ${project.recipientContact.trim()}`)
-  }
-  if (project.recipientBranch) {
-    const addrLines = doc.splitTextToSize(project.recipientBranch.trim(), colWidth - 4)
-    deliveryLines.push(...addrLines)
-  }
 
-  if (deliveryLines.length === 0) {
-    const fallbackAddr = project.deliveryAddress || `${project.location || ""}${project.state ? `, ${project.state}` : ""}`
-    if (fallbackAddr.trim()) {
-      const addrLines = doc.splitTextToSize(fallbackAddr.trim(), colWidth - 4)
-      deliveryLines.push(...addrLines)
-    }
+  if (formattedAddr.isCustom) {
+    if (formattedAddr.name) deliveryLines.push(`Name: ${formattedAddr.name}`)
+    if (formattedAddr.contact) deliveryLines.push(`Contact: ${formattedAddr.contact}`)
+    const addrLines = doc.splitTextToSize(`Address: ${formattedAddr.addressText}`, colWidth - 4)
+    deliveryLines.push(...addrLines)
+  } else {
+    const addrLines = doc.splitTextToSize(formattedAddr.singleLine, colWidth - 4)
+    deliveryLines.push(...addrLines)
   }
 
   let fontSize = 8.5
